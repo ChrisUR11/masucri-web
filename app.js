@@ -184,4 +184,5 @@ function cargarTrabajos() {
         totalIncomeEl.textContent = `₡ ${sumaIngresos.toLocaleString('es-CR')}`;
         totalSalesEl.textContent = contadorVentas;
     });
+    
 }
