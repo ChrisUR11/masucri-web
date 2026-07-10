@@ -21,14 +21,20 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+// ==========================================
+// 3. SEGURIDAD: CORREOS PERMITIDOS
+// ==========================================
+const CORREOS_PERMITIDOS = [
+    "ulloarodriguezchris@gmail.com",
+    "anisrmj5@gmail.com"
+];
+
 let listaMovimientos = [];
-let datosParaExportar = []; // Almacena los datos filtrados actuales
+let datosParaExportar = [];
 let graficoInstancia = null;
 let modalInstancia = null;
 
-// ==========================================
-// 3. REFERENCIAS AL DOM
-// ==========================================
+// Referencias DOM
 const loginContainer = document.getElementById('login-container');
 const appContainer = document.getElementById('app-container');
 const btnLogin = document.getElementById('btn-login');
@@ -43,7 +49,6 @@ const vistaReportes = document.getElementById('vista-reportes');
 const formMovimiento = document.getElementById('form-movimiento');
 const formEditar = document.getElementById('form-editar');
 
-// Filtros y Búsqueda
 const busquedaTexto = document.getElementById('busqueda-texto');
 const filtroModo = document.getElementById('filtro-modo');
 const filtroInicio = document.getElementById('filtro-inicio');
@@ -52,11 +57,9 @@ const btnLimpiar = document.getElementById('btn-limpiar');
 const tablaReportes = document.getElementById('tabla-reportes');
 const ctxGrafico = document.getElementById('miGrafico').getContext('2d');
 
-// Botones de Exportar
 const btnExportPdf = document.getElementById('btn-export-pdf');
 const btnExportExcel = document.getElementById('btn-export-excel');
 
-// Resúmenes y Tarjetas
 const cardEntradas = document.getElementById('card-entradas');
 const cardSalidas = document.getElementById('card-salidas');
 const cardBalance = document.getElementById('card-balance');
@@ -82,32 +85,50 @@ navRegistro.addEventListener('click', (e) => { e.preventDefault(); cambiarVista(
 navReportes.addEventListener('click', (e) => { e.preventDefault(); cambiarVista(vistaReportes, navReportes); generarReporte(); });
 
 // ==========================================
-// 5. AUTENTICACIÓN
+// 5. AUTENTICACIÓN ESTRICTA
 // ==========================================
 btnLogin.addEventListener('click', async () => {
-    try { await signInWithPopup(auth, new GoogleAuthProvider()); }
-    catch (error) { Swal.fire({ icon: 'error', title: 'Oops...', text: 'Hubo un error al iniciar sesión.' }); }
+    try {
+        await signInWithPopup(auth, new GoogleAuthProvider());
+    } catch (error) {
+        Swal.fire({ icon: 'error', title: 'Oops...', text: 'Hubo un error al iniciar sesión.' });
+    }
 });
 
 btnLogout.addEventListener('click', async () => {
     const result = await Swal.fire({
-        title: '¿Cerrar sesión?', text: "Tendrás que volver a ingresar.", icon: 'warning',
+        title: '¿Cerrar sesión?', icon: 'warning',
         showCancelButton: true, confirmButtonColor: '#d33', cancelButtonColor: '#3085d6',
         confirmButtonText: 'Sí, salir', cancelButtonText: 'Cancelar'
     });
     if (result.isConfirmed) { await signOut(auth); }
 });
 
-onAuthStateChanged(auth, (user) => {
+onAuthStateChanged(auth, async (user) => {
     if (user) {
-        loginContainer.classList.add('d-none');
-        appContainer.classList.remove('d-none');
-        userInfo.textContent = `Hola, ${user.displayName}`;
-        modalInstancia = new bootstrap.Modal(document.getElementById('modalEditar'));
-        cargarDatos();
+        // Verificar si el correo está en la lista permitida
+        if (CORREOS_PERMITIDOS.includes(user.email)) {
+            // ACCESO PERMITIDO
+            loginContainer.classList.add('d-none');
+            appContainer.classList.remove('d-none');
+            appContainer.classList.add('d-flex'); // Para el footer
+            userInfo.textContent = `Admin: ${user.displayName}`;
+            modalInstancia = new bootstrap.Modal(document.getElementById('modalEditar'));
+            cargarDatos();
+        } else {
+            // ACCESO DENEGADO
+            await signOut(auth);
+            Swal.fire({
+                icon: 'error',
+                title: 'Acceso Denegado',
+                text: 'No tienes permisos de administrador para entrar a este sistema.'
+            });
+        }
     } else {
+        // Usuario desconectado
         loginContainer.classList.remove('d-none');
         appContainer.classList.add('d-none');
+        appContainer.classList.remove('d-flex');
     }
 });
 
@@ -119,8 +140,8 @@ formMovimiento.addEventListener('submit', async (e) => {
     const descripcionStr = document.getElementById('descripcion').value.trim();
     const montoNum = parseFloat(document.getElementById('monto').value);
 
-    if (descripcionStr === "") return Swal.fire({ icon: 'warning', title: 'Atención', text: 'El concepto/descripción no puede estar vacío.' });
-    if (isNaN(montoNum) || montoNum <= 0) return Swal.fire({ icon: 'warning', title: 'Atención', text: 'El monto debe ser un número mayor a cero.' });
+    if (descripcionStr === "") return Swal.fire({ icon: 'warning', title: 'Atención', text: 'El concepto no puede estar vacío.' });
+    if (isNaN(montoNum) || montoNum <= 0) return Swal.fire({ icon: 'warning', title: 'Atención', text: 'El monto debe ser mayor a cero.' });
 
     const btnSubmit = formMovimiento.querySelector('button');
     btnSubmit.disabled = true;
@@ -176,7 +197,7 @@ formEditar.addEventListener('submit', async (e) => {
     const montoNum = parseFloat(document.getElementById('edit-monto').value);
 
     if (descripcionStr === "") return Swal.fire({ icon: 'warning', title: 'Atención', text: 'El concepto no puede estar vacío.' });
-    if (isNaN(montoNum) || montoNum <= 0) return Swal.fire({ icon: 'warning', title: 'Atención', text: 'El monto debe ser un número mayor a cero.' });
+    if (isNaN(montoNum) || montoNum <= 0) return Swal.fire({ icon: 'warning', title: 'Atención', text: 'El monto debe ser mayor a cero.' });
 
     try {
         await updateDoc(doc(db, "movimientos", document.getElementById('edit-id').value), {
@@ -222,12 +243,10 @@ function generarReporte() {
     const fin = filtroFin.value;
     const modo = filtroModo.value;
 
-    // Control de visualización de las tarjetas
     cardEntradas.classList.toggle('d-none', modo === 'salidas');
     cardSalidas.classList.toggle('d-none', modo === 'entradas');
     cardBalance.classList.toggle('d-none', modo !== 'ambos');
 
-    // 1. Filtrar por Búsqueda de Texto
     if (texto) {
         datosFiltrados = datosFiltrados.filter(mov =>
             mov.descripcion.toLowerCase().includes(texto) ||
@@ -235,16 +254,13 @@ function generarReporte() {
         );
     }
 
-    // 2. Filtrar por Fecha
     if (inicio && fin) datosFiltrados = datosFiltrados.filter(mov => mov.fecha >= inicio && mov.fecha <= fin);
     else if (inicio) datosFiltrados = datosFiltrados.filter(mov => mov.fecha >= inicio);
     else if (fin) datosFiltrados = datosFiltrados.filter(mov => mov.fecha <= fin);
 
-    // 3. Filtrar por Modo
     if (modo === 'entradas') datosFiltrados = datosFiltrados.filter(mov => mov.tipo === 'entrada');
     if (modo === 'salidas') datosFiltrados = datosFiltrados.filter(mov => mov.tipo === 'salida');
 
-    // Actualizamos la variable global para las exportaciones
     datosParaExportar = datosFiltrados;
 
     let totalEntradas = 0; let totalSalidas = 0; let htmlTabla = '';
@@ -312,26 +328,23 @@ btnExportPdf.addEventListener('click', () => {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
 
-    // Título del PDF
     doc.setFontSize(16);
     doc.text("Reporte de Movimientos - MASUCRI", 14, 15);
     doc.setFontSize(10);
     doc.setTextColor(100);
     doc.text(`Generado el: ${new Date().toLocaleDateString('es-CR')}`, 14, 22);
 
-    // Configurar tabla
-    const tableColumn = ["Fecha", "Tipo", "Concepto / Detalle", "Entidad", "Monto"];
+    const tableColumn = ["Fecha", "Tipo", "Concepto / Detalle", "Cliente / Proveedor", "Monto"];
     const tableRows = [];
 
     datosParaExportar.forEach(mov => {
-        const movData = [
+        tableRows.push([
             mov.fecha,
             mov.tipo.toUpperCase(),
             mov.descripcion,
             mov.entidad || 'N/A',
             `₡${mov.monto.toLocaleString('es-CR')}`
-        ];
-        tableRows.push(movData);
+        ]);
     });
 
     doc.autoTable({
@@ -349,7 +362,6 @@ btnExportPdf.addEventListener('click', () => {
 btnExportExcel.addEventListener('click', () => {
     if (datosParaExportar.length === 0) return Swal.fire({ icon: 'warning', title: 'Vacío', text: 'No hay datos para exportar.' });
 
-    // Formatear datos para el Excel
     const dataSheet = datosParaExportar.map(mov => ({
         "Fecha": mov.fecha,
         "Tipo": mov.tipo.toUpperCase(),

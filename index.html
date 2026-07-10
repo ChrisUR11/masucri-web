@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MASUCRI - Gestión de Negocio</title>
+    <title>MASUCRI - Panel Administrativo</title>
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Chart.js para los gráficos -->
@@ -38,10 +38,13 @@
 
 <body class="bg-light">
 
-    <!-- PANTALLA DE LOGIN -->
+    <!-- ==========================================
+         PANTALLA DE LOGIN (Bloqueo de Seguridad)
+    =========================================== -->
     <div id="login-container" class="login-screen">
         <div class="card shadow p-4 text-center" style="max-width: 400px; width: 100%;">
             <h2 class="mb-4 text-primary fw-bold">MASUCRI</h2>
+            <p class="text-muted">Acceso exclusivo para administradores</p>
             <button id="btn-login" class="btn btn-dark btn-lg w-100 mt-3">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
                     class="bi bi-google me-2" viewBox="0 0 16 16">
@@ -53,8 +56,10 @@
         </div>
     </div>
 
-    <!-- APLICACIÓN PRINCIPAL (Flex column para el footer) -->
-    <div id="app-container" class="d-none d-flex flex-column min-vh-100">
+    <!-- ==========================================
+         APLICACIÓN PRINCIPAL (Solo visible si es Admin)
+    =========================================== -->
+    <div id="app-container" class="d-none flex-column min-vh-100">
 
         <!-- Menú de Navegación -->
         <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 shadow">
@@ -73,7 +78,7 @@
                         </li>
                     </ul>
                     <div class="d-flex align-items-center mt-2 mt-lg-0">
-                        <span id="user-info" class="text-white me-3"></span>
+                        <span id="user-info" class="text-white me-3 fw-semibold"></span>
                         <button id="btn-logout" class="btn btn-sm btn-outline-danger">Salir</button>
                     </div>
                 </div>
@@ -87,7 +92,7 @@
             <div id="vista-registro" class="view-section active">
                 <div class="row justify-content-center">
                     <div class="col-md-8">
-                        <div class="card shadow-sm mb-5">
+                        <div class="card shadow-sm mb-5 border-0">
                             <div class="card-header bg-primary text-white fw-bold">
                                 Registrar Movimiento
                             </div>
@@ -109,13 +114,13 @@
                                     <div class="mb-3">
                                         <label class="form-label fw-semibold">Concepto / Descripción</label>
                                         <input type="text" id="descripcion" class="form-control"
-                                            placeholder="Ej. Camiseta sublimada, o compra de material..." required>
+                                            placeholder="Ej. Confección de uniforme, sublimación de taza..." required>
                                     </div>
                                     <div class="row mb-3">
                                         <div class="col-md-6">
                                             <label class="form-label fw-semibold">Cliente / Proveedor</label>
                                             <input type="text" id="entidad" class="form-control"
-                                                placeholder="Nombre (Opcional)">
+                                                placeholder="(Opcional)">
                                         </div>
                                         <div class="col-md-6 mt-3 mt-md-0">
                                             <label class="form-label fw-semibold">Monto Total (₡)</label>
@@ -123,7 +128,7 @@
                                                 step="0.01">
                                         </div>
                                     </div>
-                                    <button type="submit" class="btn btn-primary w-100 py-2 fw-bold">Guardar
+                                    <button type="submit" class="btn btn-primary w-100 py-2 fw-bold shadow-sm">Guardar
                                         Movimiento</button>
                                 </form>
                             </div>
@@ -143,7 +148,7 @@
                                 <label class="form-label small text-muted mb-1 fw-bold">Buscar en tiempo real</label>
                                 <input type="text" id="busqueda-texto"
                                     class="form-control form-control-sm border-primary"
-                                    placeholder="Escribe un producto, cliente o concepto...">
+                                    placeholder="Buscar por concepto o cliente...">
                             </div>
                             <div class="col-md-2">
                                 <label class="form-label small text-muted mb-1">Mostrar</label>
@@ -245,7 +250,7 @@
         <footer class="bg-dark text-white text-center py-3 mt-4 shadow-lg">
             <div class="container">
                 <p class="mb-0 fw-bold fs-5">MASUCRI</p>
-                <small class="text-white-50">Sistema de Gestión y Control © 2026</small>
+                <small class="text-white-50">Sistema Administrativo - Confecciones y Sublimaciones</small>
             </div>
         </footer>
 
