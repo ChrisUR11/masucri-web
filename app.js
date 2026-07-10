@@ -22,6 +22,7 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 let listaMovimientos = [];
+let datosParaExportar = []; // Almacena los datos filtrados actuales
 let graficoInstancia = null;
 let modalInstancia = null;
 
@@ -42,15 +43,20 @@ const vistaReportes = document.getElementById('vista-reportes');
 const formMovimiento = document.getElementById('form-movimiento');
 const formEditar = document.getElementById('form-editar');
 
+// Filtros y Búsqueda
+const busquedaTexto = document.getElementById('busqueda-texto');
 const filtroModo = document.getElementById('filtro-modo');
 const filtroInicio = document.getElementById('filtro-inicio');
 const filtroFin = document.getElementById('filtro-fin');
-const btnFiltrar = document.getElementById('btn-filtrar');
 const btnLimpiar = document.getElementById('btn-limpiar');
 const tablaReportes = document.getElementById('tabla-reportes');
 const ctxGrafico = document.getElementById('miGrafico').getContext('2d');
 
-// Resúmenes y Tarjetas (Para ocultar/mostrar)
+// Botones de Exportar
+const btnExportPdf = document.getElementById('btn-export-pdf');
+const btnExportExcel = document.getElementById('btn-export-excel');
+
+// Resúmenes y Tarjetas
 const cardEntradas = document.getElementById('card-entradas');
 const cardSalidas = document.getElementById('card-salidas');
 const cardBalance = document.getElementById('card-balance');
@@ -106,40 +112,28 @@ onAuthStateChanged(auth, (user) => {
 });
 
 // ==========================================
-// 6. CREAR, CARGAR, EDITAR Y BORRAR (CRUD)
+// 6. CREAR, CARGAR, EDITAR Y BORRAR
 // ==========================================
-
-// CREAR (Con Validaciones Estrictas)
 formMovimiento.addEventListener('submit', async (e) => {
     e.preventDefault();
-
     const descripcionStr = document.getElementById('descripcion').value.trim();
     const montoNum = parseFloat(document.getElementById('monto').value);
 
-    // Validaciones
-    if (descripcionStr === "") {
-        Swal.fire({ icon: 'warning', title: 'Atención', text: 'El concepto/descripción no puede estar vacío.' });
-        return;
-    }
-    if (isNaN(montoNum) || montoNum <= 0) {
-        Swal.fire({ icon: 'warning', title: 'Atención', text: 'El monto debe ser un número mayor a cero.' });
-        return;
-    }
+    if (descripcionStr === "") return Swal.fire({ icon: 'warning', title: 'Atención', text: 'El concepto/descripción no puede estar vacío.' });
+    if (isNaN(montoNum) || montoNum <= 0) return Swal.fire({ icon: 'warning', title: 'Atención', text: 'El monto debe ser un número mayor a cero.' });
 
     const btnSubmit = formMovimiento.querySelector('button');
     btnSubmit.disabled = true;
 
-    const nuevoMovimiento = {
-        tipo: document.getElementById('tipo').value,
-        fecha: document.getElementById('fecha').value,
-        descripcion: descripcionStr,
-        entidad: document.getElementById('entidad').value.trim(),
-        monto: montoNum,
-        timestamp: new Date()
-    };
-
     try {
-        await addDoc(collection(db, "movimientos"), nuevoMovimiento);
+        await addDoc(collection(db, "movimientos"), {
+            tipo: document.getElementById('tipo').value,
+            fecha: document.getElementById('fecha').value,
+            descripcion: descripcionStr,
+            entidad: document.getElementById('entidad').value.trim(),
+            monto: montoNum,
+            timestamp: new Date()
+        });
         formMovimiento.reset();
         document.getElementById('fecha').valueAsDate = new Date();
         Swal.fire({ icon: 'success', title: '¡Guardado!', timer: 1500, showConfirmButton: false });
@@ -150,143 +144,108 @@ formMovimiento.addEventListener('submit', async (e) => {
     }
 });
 
-// CARGAR DATOS
 function cargarDatos() {
     const q = query(collection(db, "movimientos"), orderBy("fecha", "desc"));
     onSnapshot(q, (snapshot) => {
         listaMovimientos = [];
-        snapshot.forEach((doc) => {
-            listaMovimientos.push({ id: doc.id, ...doc.data() });
-        });
+        snapshot.forEach((doc) => { listaMovimientos.push({ id: doc.id, ...doc.data() }); });
         if (vistaReportes.classList.contains('active')) generarReporte();
     });
 }
 
-// DELEGAR EVENTOS A LA TABLA (EDITAR Y BORRAR)
 tablaReportes.addEventListener('click', (e) => {
-    if (e.target.closest('.btn-editar')) {
-        const id = e.target.closest('.btn-editar').dataset.id;
-        abrirModalEdicion(id);
-    }
-    if (e.target.closest('.btn-borrar')) {
-        const id = e.target.closest('.btn-borrar').dataset.id;
-        borrarMovimiento(id);
-    }
+    if (e.target.closest('.btn-editar')) abrirModalEdicion(e.target.closest('.btn-editar').dataset.id);
+    if (e.target.closest('.btn-borrar')) borrarMovimiento(e.target.closest('.btn-borrar').dataset.id);
 });
 
-// ABRIR MODAL CON DATOS
 function abrirModalEdicion(id) {
     const mov = listaMovimientos.find(m => m.id === id);
     if (!mov) return;
-
     document.getElementById('edit-id').value = mov.id;
     document.getElementById('edit-tipo').value = mov.tipo;
     document.getElementById('edit-fecha').value = mov.fecha;
     document.getElementById('edit-descripcion').value = mov.descripcion;
     document.getElementById('edit-entidad').value = mov.entidad || '';
     document.getElementById('edit-monto').value = mov.monto;
-
     modalInstancia.show();
 }
 
-// ACTUALIZAR (Con Validaciones)
 formEditar.addEventListener('submit', async (e) => {
     e.preventDefault();
-
     const descripcionStr = document.getElementById('edit-descripcion').value.trim();
     const montoNum = parseFloat(document.getElementById('edit-monto').value);
 
-    // Validaciones
-    if (descripcionStr === "") {
-        Swal.fire({ icon: 'warning', title: 'Atención', text: 'El concepto no puede estar vacío.' });
-        return;
-    }
-    if (isNaN(montoNum) || montoNum <= 0) {
-        Swal.fire({ icon: 'warning', title: 'Atención', text: 'El monto debe ser un número mayor a cero.' });
-        return;
-    }
-
-    const id = document.getElementById('edit-id').value;
-    const datosActualizados = {
-        tipo: document.getElementById('edit-tipo').value,
-        fecha: document.getElementById('edit-fecha').value,
-        descripcion: descripcionStr,
-        entidad: document.getElementById('edit-entidad').value.trim(),
-        monto: montoNum
-    };
+    if (descripcionStr === "") return Swal.fire({ icon: 'warning', title: 'Atención', text: 'El concepto no puede estar vacío.' });
+    if (isNaN(montoNum) || montoNum <= 0) return Swal.fire({ icon: 'warning', title: 'Atención', text: 'El monto debe ser un número mayor a cero.' });
 
     try {
-        await updateDoc(doc(db, "movimientos", id), datosActualizados);
+        await updateDoc(doc(db, "movimientos", document.getElementById('edit-id').value), {
+            tipo: document.getElementById('edit-tipo').value,
+            fecha: document.getElementById('edit-fecha').value,
+            descripcion: descripcionStr,
+            entidad: document.getElementById('edit-entidad').value.trim(),
+            monto: montoNum
+        });
         modalInstancia.hide();
         Swal.fire({ icon: 'success', title: 'Actualizado', timer: 1500, showConfirmButton: false });
-    } catch (error) {
-        Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo actualizar.' });
-    }
+    } catch (error) { Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo actualizar.' }); }
 });
 
-// BORRAR
 async function borrarMovimiento(id) {
     const result = await Swal.fire({
-        title: '¿Eliminar registro?',
-        text: "Esta acción no se puede deshacer.",
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#d33',
-        cancelButtonColor: '#3085d6',
-        confirmButtonText: 'Sí, borrar',
-        cancelButtonText: 'Cancelar'
+        title: '¿Eliminar registro?', text: "Esta acción no se puede deshacer.", icon: 'warning',
+        showCancelButton: true, confirmButtonColor: '#d33', cancelButtonColor: '#3085d6', confirmButtonText: 'Sí, borrar', cancelButtonText: 'Cancelar'
     });
-
     if (result.isConfirmed) {
-        try {
-            await deleteDoc(doc(db, "movimientos", id));
-            Swal.fire({ icon: 'success', title: 'Borrado', timer: 1500, showConfirmButton: false });
-        } catch (error) {
-            Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo eliminar.' });
-        }
+        try { await deleteDoc(doc(db, "movimientos", id)); Swal.fire({ icon: 'success', title: 'Borrado', timer: 1500, showConfirmButton: false }); }
+        catch (error) { Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo eliminar.' }); }
     }
 }
 
 // ==========================================
-// 7. LÓGICA DE REPORTES Y GRÁFICOS
+// 7. LÓGICA DE REPORTES EN TIEMPO REAL
 // ==========================================
-btnFiltrar.addEventListener('click', generarReporte);
+busquedaTexto.addEventListener('input', generarReporte);
 filtroModo.addEventListener('change', generarReporte);
+filtroInicio.addEventListener('change', generarReporte);
+filtroFin.addEventListener('change', generarReporte);
 
 btnLimpiar.addEventListener('click', () => {
-    filtroInicio.value = ''; filtroFin.value = ''; filtroModo.value = 'ambos';
+    busquedaTexto.value = ''; filtroInicio.value = ''; filtroFin.value = ''; filtroModo.value = 'ambos';
     generarReporte();
 });
 
 function generarReporte() {
     let datosFiltrados = listaMovimientos;
+    const texto = busquedaTexto.value.toLowerCase().trim();
     const inicio = filtroInicio.value;
     const fin = filtroFin.value;
     const modo = filtroModo.value;
 
-    // Control de visualización de las tarjetas (Ocultar/Mostrar según el filtro)
-    if (modo === 'ambos') {
-        cardEntradas.classList.remove('d-none');
-        cardSalidas.classList.remove('d-none');
-        cardBalance.classList.remove('d-none');
-    } else if (modo === 'entradas') {
-        cardEntradas.classList.remove('d-none');
-        cardSalidas.classList.add('d-none');
-        cardBalance.classList.add('d-none');
-    } else if (modo === 'salidas') {
-        cardEntradas.classList.add('d-none');
-        cardSalidas.classList.remove('d-none');
-        cardBalance.classList.add('d-none');
+    // Control de visualización de las tarjetas
+    cardEntradas.classList.toggle('d-none', modo === 'salidas');
+    cardSalidas.classList.toggle('d-none', modo === 'entradas');
+    cardBalance.classList.toggle('d-none', modo !== 'ambos');
+
+    // 1. Filtrar por Búsqueda de Texto
+    if (texto) {
+        datosFiltrados = datosFiltrados.filter(mov =>
+            mov.descripcion.toLowerCase().includes(texto) ||
+            (mov.entidad && mov.entidad.toLowerCase().includes(texto))
+        );
     }
 
-    // 1. Filtrar por Fecha
+    // 2. Filtrar por Fecha
     if (inicio && fin) datosFiltrados = datosFiltrados.filter(mov => mov.fecha >= inicio && mov.fecha <= fin);
     else if (inicio) datosFiltrados = datosFiltrados.filter(mov => mov.fecha >= inicio);
     else if (fin) datosFiltrados = datosFiltrados.filter(mov => mov.fecha <= fin);
 
-    // 2. Filtrar por Modo (Entradas, Salidas, Ambos)
+    // 3. Filtrar por Modo
     if (modo === 'entradas') datosFiltrados = datosFiltrados.filter(mov => mov.tipo === 'entrada');
     if (modo === 'salidas') datosFiltrados = datosFiltrados.filter(mov => mov.tipo === 'salida');
+
+    // Actualizamos la variable global para las exportaciones
+    datosParaExportar = datosFiltrados;
 
     let totalEntradas = 0; let totalSalidas = 0; let htmlTabla = '';
 
@@ -316,12 +275,10 @@ function generarReporte() {
     });
 
     if (datosFiltrados.length === 0) {
-        htmlTabla = `<tr><td colspan="4" class="text-center text-muted py-4">No hay datos para mostrar en esta vista.</td></tr>`;
+        htmlTabla = `<tr><td colspan="4" class="text-center text-muted py-4">No hay datos para mostrar con estos filtros.</td></tr>`;
     }
 
     tablaReportes.innerHTML = htmlTabla;
-
-    // Actualizar resúmenes
     resEntradas.textContent = `₡${totalEntradas.toLocaleString('es-CR')}`;
     resSalidas.textContent = `₡${totalSalidas.toLocaleString('es-CR')}`;
     resBalance.textContent = `₡${(totalEntradas - totalSalidas).toLocaleString('es-CR')}`;
@@ -333,37 +290,78 @@ function dibujarGrafico(entradas, salidas, modo) {
     if (graficoInstancia) graficoInstancia.destroy();
     if (entradas === 0 && salidas === 0) return;
 
-    let labelsGrafico = [];
-    let dataGrafico = [];
-    let coloresGrafico = [];
-
-    if (modo === 'ambos') {
-        labelsGrafico = ['Entradas', 'Salidas'];
-        dataGrafico = [entradas, salidas];
-        coloresGrafico = ['#198754', '#dc3545'];
-    } else if (modo === 'entradas') {
-        labelsGrafico = ['Entradas'];
-        dataGrafico = [entradas];
-        coloresGrafico = ['#198754'];
-    } else if (modo === 'salidas') {
-        labelsGrafico = ['Salidas'];
-        dataGrafico = [salidas];
-        coloresGrafico = ['#dc3545'];
-    }
+    let labels = []; let data = []; let colors = [];
+    if (modo === 'ambos') { labels = ['Entradas', 'Salidas']; data = [entradas, salidas]; colors = ['#198754', '#dc3545']; }
+    else if (modo === 'entradas') { labels = ['Entradas']; data = [entradas]; colors = ['#198754']; }
+    else if (modo === 'salidas') { labels = ['Salidas']; data = [salidas]; colors = ['#dc3545']; }
 
     graficoInstancia = new Chart(ctxGrafico, {
         type: 'doughnut',
-        data: {
-            labels: labelsGrafico,
-            datasets: [{
-                data: dataGrafico,
-                backgroundColor: coloresGrafico,
-                hoverOffset: 4
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: { legend: { position: 'bottom' } }
-        }
+        data: { labels: labels, datasets: [{ data: data, backgroundColor: colors, hoverOffset: 4 }] },
+        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
     });
 }
+
+// ==========================================
+// 8. EXPORTACIONES (PDF Y EXCEL)
+// ==========================================
+
+btnExportPdf.addEventListener('click', () => {
+    if (datosParaExportar.length === 0) return Swal.fire({ icon: 'warning', title: 'Vacío', text: 'No hay datos para exportar.' });
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    // Título del PDF
+    doc.setFontSize(16);
+    doc.text("Reporte de Movimientos - MASUCRI", 14, 15);
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`Generado el: ${new Date().toLocaleDateString('es-CR')}`, 14, 22);
+
+    // Configurar tabla
+    const tableColumn = ["Fecha", "Tipo", "Concepto / Detalle", "Entidad", "Monto"];
+    const tableRows = [];
+
+    datosParaExportar.forEach(mov => {
+        const movData = [
+            mov.fecha,
+            mov.tipo.toUpperCase(),
+            mov.descripcion,
+            mov.entidad || 'N/A',
+            `₡${mov.monto.toLocaleString('es-CR')}`
+        ];
+        tableRows.push(movData);
+    });
+
+    doc.autoTable({
+        head: [tableColumn],
+        body: tableRows,
+        startY: 28,
+        theme: 'striped',
+        headStyles: { fillColor: [41, 128, 185] }
+    });
+
+    doc.save(`Reporte_MASUCRI_${new Date().getTime()}.pdf`);
+    Swal.fire({ icon: 'success', title: 'Exportado', text: 'El reporte PDF se ha descargado.', timer: 1500, showConfirmButton: false });
+});
+
+btnExportExcel.addEventListener('click', () => {
+    if (datosParaExportar.length === 0) return Swal.fire({ icon: 'warning', title: 'Vacío', text: 'No hay datos para exportar.' });
+
+    // Formatear datos para el Excel
+    const dataSheet = datosParaExportar.map(mov => ({
+        "Fecha": mov.fecha,
+        "Tipo": mov.tipo.toUpperCase(),
+        "Concepto / Detalle": mov.descripcion,
+        "Cliente / Proveedor": mov.entidad || '',
+        "Monto (Colones)": mov.monto
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(dataSheet);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Reporte");
+
+    XLSX.writeFile(wb, `Reporte_MASUCRI_${new Date().getTime()}.xlsx`);
+    Swal.fire({ icon: 'success', title: 'Exportado', text: 'El reporte de Excel se ha descargado.', timer: 1500, showConfirmButton: false });
+});

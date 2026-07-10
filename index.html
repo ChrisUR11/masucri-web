@@ -5,10 +5,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MASUCRI - Gestión de Negocio</title>
+    <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Chart.js para los gráficos -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- SweetAlert2 CSS y JS -->
     <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11.10.6/dist/sweetalert2.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.10.6/dist/sweetalert2.all.min.js"></script>
+    <!-- Librerías para Exportar PDF y Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
     <style>
         .login-screen {
@@ -31,6 +38,7 @@
 
 <body class="bg-light">
 
+    <!-- PANTALLA DE LOGIN -->
     <div id="login-container" class="login-screen">
         <div class="card shadow p-4 text-center" style="max-width: 400px; width: 100%;">
             <h2 class="mb-4 text-primary fw-bold">MASUCRI</h2>
@@ -45,8 +53,10 @@
         </div>
     </div>
 
-    <div id="app-container" class="d-none">
+    <!-- APLICACIÓN PRINCIPAL (Flex column para el footer) -->
+    <div id="app-container" class="d-none d-flex flex-column min-vh-100">
 
+        <!-- Menú de Navegación -->
         <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 shadow">
             <div class="container">
                 <a class="navbar-brand fw-bold" href="#">MASUCRI</a>
@@ -70,7 +80,10 @@
             </div>
         </nav>
 
-        <div class="container">
+        <!-- Contenido Central -->
+        <div class="container flex-grow-1">
+
+            <!-- VISTA 1: REGISTRO -->
             <div id="vista-registro" class="view-section active">
                 <div class="row justify-content-center">
                     <div class="col-md-8">
@@ -119,31 +132,54 @@
                 </div>
             </div>
 
+            <!-- VISTA 2: REPORTES Y GRÁFICOS -->
             <div id="vista-reportes" class="view-section">
 
-                <div class="card shadow-sm mb-4">
-                    <div class="card-body d-flex flex-wrap gap-3 align-items-end">
-                        <div>
-                            <label class="form-label small text-muted mb-1">Mostrar</label>
-                            <select id="filtro-modo" class="form-select form-select-sm">
-                                <option value="ambos">Entradas y Salidas</option>
-                                <option value="entradas">Solo Entradas</option>
-                                <option value="salidas">Solo Salidas</option>
-                            </select>
+                <!-- Búsqueda, Filtros y Exportación en Tiempo Real -->
+                <div class="card shadow-sm mb-4 border-0">
+                    <div class="card-body bg-white rounded">
+                        <div class="row g-3 align-items-end">
+                            <div class="col-md-4">
+                                <label class="form-label small text-muted mb-1 fw-bold">Buscar en tiempo real</label>
+                                <input type="text" id="busqueda-texto"
+                                    class="form-control form-control-sm border-primary"
+                                    placeholder="Escribe un producto, cliente o concepto...">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small text-muted mb-1">Mostrar</label>
+                                <select id="filtro-modo" class="form-select form-select-sm">
+                                    <option value="ambos">Todo</option>
+                                    <option value="entradas">Entradas</option>
+                                    <option value="salidas">Salidas</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small text-muted mb-1">Desde</label>
+                                <input type="date" id="filtro-inicio" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small text-muted mb-1">Hasta</label>
+                                <input type="date" id="filtro-fin" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-md-2">
+                                <button id="btn-limpiar" class="btn btn-sm btn-outline-secondary w-100">Ver
+                                    Todo</button>
+                            </div>
                         </div>
-                        <div>
-                            <label class="form-label small text-muted mb-1">Desde</label>
-                            <input type="date" id="filtro-inicio" class="form-control form-control-sm">
+                        <hr class="my-3">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <span class="small text-muted fw-semibold">Descargar datos de la vista actual:</span>
+                            <div>
+                                <button id="btn-export-pdf" class="btn btn-sm btn-danger px-3 shadow-sm">📄 Exportar
+                                    PDF</button>
+                                <button id="btn-export-excel" class="btn btn-sm btn-success px-3 shadow-sm">📊 Exportar
+                                    Excel</button>
+                            </div>
                         </div>
-                        <div>
-                            <label class="form-label small text-muted mb-1">Hasta</label>
-                            <input type="date" id="filtro-fin" class="form-control form-control-sm">
-                        </div>
-                        <button id="btn-filtrar" class="btn btn-sm btn-dark">Aplicar Filtro</button>
-                        <button id="btn-limpiar" class="btn btn-sm btn-outline-secondary">Ver Todo</button>
                     </div>
                 </div>
 
+                <!-- Tarjetas de Resumen -->
                 <div class="row mb-4 justify-content-center" id="contenedor-resumen">
                     <div class="col-md-4 mb-3" id="card-entradas">
                         <div class="card text-bg-success shadow-sm text-center h-100">
@@ -171,9 +207,10 @@
                     </div>
                 </div>
 
+                <!-- Gráfico y Tabla -->
                 <div class="row">
                     <div class="col-lg-4 mb-4">
-                        <div class="card shadow-sm h-100">
+                        <div class="card shadow-sm h-100 border-0">
                             <div class="card-header bg-white fw-bold">Gráfico</div>
                             <div class="card-body d-flex justify-content-center align-items-center">
                                 <canvas id="miGrafico"></canvas>
@@ -181,11 +218,11 @@
                         </div>
                     </div>
                     <div class="col-lg-8 mb-4">
-                        <div class="card shadow-sm h-100">
+                        <div class="card shadow-sm h-100 border-0">
                             <div class="card-header bg-white fw-bold">Detalle de Movimientos</div>
                             <div class="card-body table-responsive p-0" style="max-height: 500px; overflow-y: auto;">
                                 <table class="table table-hover align-middle m-0">
-                                    <thead class="table-light sticky-top">
+                                    <thead class="table-light sticky-top shadow-sm">
                                         <tr>
                                             <th>Fecha</th>
                                             <th>Concepto</th>
@@ -194,6 +231,7 @@
                                         </tr>
                                     </thead>
                                     <tbody id="tabla-reportes">
+                                        <!-- Datos inyectados por JS -->
                                     </tbody>
                                 </table>
                             </div>
@@ -202,11 +240,21 @@
                 </div>
             </div>
         </div>
+
+        <!-- FOOTER -->
+        <footer class="bg-dark text-white text-center py-3 mt-4 shadow-lg">
+            <div class="container">
+                <p class="mb-0 fw-bold fs-5">MASUCRI</p>
+                <small class="text-white-50">Sistema de Gestión y Control © 2026</small>
+            </div>
+        </footer>
+
     </div>
 
+    <!-- MODAL DE EDICIÓN -->
     <div class="modal fade" id="modalEditar" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
-            <div class="modal-content">
+            <div class="modal-content border-0 shadow">
                 <div class="modal-header bg-warning">
                     <h5 class="modal-title fw-bold">Editar Movimiento</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -241,13 +289,15 @@
                                 <input type="number" id="edit-monto" class="form-control" required min="1" step="0.01">
                             </div>
                         </div>
-                        <button type="submit" class="btn btn-warning w-100 fw-bold">Actualizar Cambios</button>
+                        <button type="submit" class="btn btn-warning w-100 fw-bold shadow-sm">Actualizar
+                            Cambios</button>
                     </form>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script type="module" src="app.js"></script>
 </body>
