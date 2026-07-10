@@ -50,6 +50,10 @@ const btnLimpiar = document.getElementById('btn-limpiar');
 const tablaReportes = document.getElementById('tabla-reportes');
 const ctxGrafico = document.getElementById('miGrafico').getContext('2d');
 
+// Resúmenes y Tarjetas (Para ocultar/mostrar)
+const cardEntradas = document.getElementById('card-entradas');
+const cardSalidas = document.getElementById('card-salidas');
+const cardBalance = document.getElementById('card-balance');
 const resEntradas = document.getElementById('resumen-entradas');
 const resSalidas = document.getElementById('resumen-salidas');
 const resBalance = document.getElementById('resumen-balance');
@@ -93,7 +97,7 @@ onAuthStateChanged(auth, (user) => {
         loginContainer.classList.add('d-none');
         appContainer.classList.remove('d-none');
         userInfo.textContent = `Hola, ${user.displayName}`;
-        modalInstancia = new bootstrap.Modal(document.getElementById('modalEditar')); // Inicializar Modal
+        modalInstancia = new bootstrap.Modal(document.getElementById('modalEditar'));
         cargarDatos();
     } else {
         loginContainer.classList.remove('d-none');
@@ -105,18 +109,32 @@ onAuthStateChanged(auth, (user) => {
 // 6. CREAR, CARGAR, EDITAR Y BORRAR (CRUD)
 // ==========================================
 
-// CREAR
+// CREAR (Con Validaciones Estrictas)
 formMovimiento.addEventListener('submit', async (e) => {
     e.preventDefault();
+
+    const descripcionStr = document.getElementById('descripcion').value.trim();
+    const montoNum = parseFloat(document.getElementById('monto').value);
+
+    // Validaciones
+    if (descripcionStr === "") {
+        Swal.fire({ icon: 'warning', title: 'Atención', text: 'El concepto/descripción no puede estar vacío.' });
+        return;
+    }
+    if (isNaN(montoNum) || montoNum <= 0) {
+        Swal.fire({ icon: 'warning', title: 'Atención', text: 'El monto debe ser un número mayor a cero.' });
+        return;
+    }
+
     const btnSubmit = formMovimiento.querySelector('button');
     btnSubmit.disabled = true;
 
     const nuevoMovimiento = {
         tipo: document.getElementById('tipo').value,
         fecha: document.getElementById('fecha').value,
-        descripcion: document.getElementById('descripcion').value,
-        entidad: document.getElementById('entidad').value,
-        monto: parseFloat(document.getElementById('monto').value),
+        descripcion: descripcionStr,
+        entidad: document.getElementById('entidad').value.trim(),
+        monto: montoNum,
         timestamp: new Date()
     };
 
@@ -138,7 +156,6 @@ function cargarDatos() {
     onSnapshot(q, (snapshot) => {
         listaMovimientos = [];
         snapshot.forEach((doc) => {
-            // Guardamos el ID del documento para poder editarlo/borrarlo luego
             listaMovimientos.push({ id: doc.id, ...doc.data() });
         });
         if (vistaReportes.classList.contains('active')) generarReporte();
@@ -172,17 +189,30 @@ function abrirModalEdicion(id) {
     modalInstancia.show();
 }
 
-// ACTUALIZAR (EDITAR)
+// ACTUALIZAR (Con Validaciones)
 formEditar.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const id = document.getElementById('edit-id').value;
 
+    const descripcionStr = document.getElementById('edit-descripcion').value.trim();
+    const montoNum = parseFloat(document.getElementById('edit-monto').value);
+
+    // Validaciones
+    if (descripcionStr === "") {
+        Swal.fire({ icon: 'warning', title: 'Atención', text: 'El concepto no puede estar vacío.' });
+        return;
+    }
+    if (isNaN(montoNum) || montoNum <= 0) {
+        Swal.fire({ icon: 'warning', title: 'Atención', text: 'El monto debe ser un número mayor a cero.' });
+        return;
+    }
+
+    const id = document.getElementById('edit-id').value;
     const datosActualizados = {
         tipo: document.getElementById('edit-tipo').value,
         fecha: document.getElementById('edit-fecha').value,
-        descripcion: document.getElementById('edit-descripcion').value,
-        entidad: document.getElementById('edit-entidad').value,
-        monto: parseFloat(document.getElementById('edit-monto').value)
+        descripcion: descripcionStr,
+        entidad: document.getElementById('edit-entidad').value.trim(),
+        monto: montoNum
     };
 
     try {
@@ -217,7 +247,6 @@ async function borrarMovimiento(id) {
     }
 }
 
-
 // ==========================================
 // 7. LÓGICA DE REPORTES Y GRÁFICOS
 // ==========================================
@@ -234,6 +263,21 @@ function generarReporte() {
     const inicio = filtroInicio.value;
     const fin = filtroFin.value;
     const modo = filtroModo.value;
+
+    // Control de visualización de las tarjetas (Ocultar/Mostrar según el filtro)
+    if (modo === 'ambos') {
+        cardEntradas.classList.remove('d-none');
+        cardSalidas.classList.remove('d-none');
+        cardBalance.classList.remove('d-none');
+    } else if (modo === 'entradas') {
+        cardEntradas.classList.remove('d-none');
+        cardSalidas.classList.add('d-none');
+        cardBalance.classList.add('d-none');
+    } else if (modo === 'salidas') {
+        cardEntradas.classList.add('d-none');
+        cardSalidas.classList.remove('d-none');
+        cardBalance.classList.add('d-none');
+    }
 
     // 1. Filtrar por Fecha
     if (inicio && fin) datosFiltrados = datosFiltrados.filter(mov => mov.fecha >= inicio && mov.fecha <= fin);
@@ -277,7 +321,7 @@ function generarReporte() {
 
     tablaReportes.innerHTML = htmlTabla;
 
-    // El resumen siempre muestra el cálculo real de lo que se está viendo
+    // Actualizar resúmenes
     resEntradas.textContent = `₡${totalEntradas.toLocaleString('es-CR')}`;
     resSalidas.textContent = `₡${totalSalidas.toLocaleString('es-CR')}`;
     resBalance.textContent = `₡${(totalEntradas - totalSalidas).toLocaleString('es-CR')}`;
@@ -289,7 +333,6 @@ function dibujarGrafico(entradas, salidas, modo) {
     if (graficoInstancia) graficoInstancia.destroy();
     if (entradas === 0 && salidas === 0) return;
 
-    // Configurar etiquetas y colores según el modo seleccionado
     let labelsGrafico = [];
     let dataGrafico = [];
     let coloresGrafico = [];
