@@ -1,26 +1,12 @@
 // ==========================================
-// 1. IMPORTACIONES DE FIREBASE (Vía CDN)
+// 1. IMPORTACIONES DE FIREBASE
 // ==========================================
-// Usamos la versión 10.8.1 (puedes actualizarla en el futuro si lo deseas)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-import {
-    getAuth,
-    GoogleAuthProvider,
-    signInWithPopup,
-    onAuthStateChanged,
-    signOut
-} from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-import {
-    getFirestore,
-    collection,
-    addDoc,
-    onSnapshot,
-    query,
-    orderBy
-} from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+import { getFirestore, collection, addDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
 // ==========================================
-// 2. CONFIGURACIÓN DE FIREBASE
+// 2. CONFIGURACIÓN
 // ==========================================
 const firebaseConfig = {
     apiKey: "AIzaSyD_p1cLfHMoSugrfPrCJPuHJKEMIH7AvV8",
@@ -31,158 +17,232 @@ const firebaseConfig = {
     appId: "1:822954372342:web:58f8d9b6181c66ce4190d7"
 };
 
-// Inicializar Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+// Variables Globales
+let listaMovimientos = [];
+let graficoInstancia = null; // Para destruir el gráfico viejo antes de dibujar uno nuevo
+
 // ==========================================
-// 3. REFERENCIAS AL DOM (HTML)
+// 3. REFERENCIAS AL DOM
 // ==========================================
-// Contenedores
+// Auth
 const loginContainer = document.getElementById('login-container');
 const appContainer = document.getElementById('app-container');
-
-// Botones y Textos de Auth
 const btnLogin = document.getElementById('btn-login');
 const btnLogout = document.getElementById('btn-logout');
 const userInfo = document.getElementById('user-info');
 
-// Dashboard
-const totalIncomeEl = document.getElementById('total-income');
-const totalSalesEl = document.getElementById('total-sales');
+// Navegación (Vistas)
+const navRegistro = document.getElementById('nav-registro');
+const navReportes = document.getElementById('nav-reportes');
+const vistaRegistro = document.getElementById('vista-registro');
+const vistaReportes = document.getElementById('vista-reportes');
 
-// Formulario y Tabla
-const salesForm = document.getElementById('sales-form');
-const salesTableBody = document.getElementById('sales-table-body');
+// Formulario
+const formMovimiento = document.getElementById('form-movimiento');
+
+// Reportes
+const filtroInicio = document.getElementById('filtro-inicio');
+const filtroFin = document.getElementById('filtro-fin');
+const btnFiltrar = document.getElementById('btn-filtrar');
+const btnLimpiar = document.getElementById('btn-limpiar');
+const tablaReportes = document.getElementById('tabla-reportes');
+const ctxGrafico = document.getElementById('miGrafico').getContext('2d');
+
+// Resúmenes numéricos
+const resEntradas = document.getElementById('resumen-entradas');
+const resSalidas = document.getElementById('resumen-salidas');
+const resBalance = document.getElementById('resumen-balance');
+
+// Establecer fecha de hoy por defecto en el formulario
+document.getElementById('fecha').valueAsDate = new Date();
 
 // ==========================================
-// 4. LÓGICA DE AUTENTICACIÓN
+// 4. SISTEMA DE NAVEGACIÓN (SPA)
 // ==========================================
+function cambiarVista(vistaActiva, linkActivo) {
+    vistaRegistro.classList.remove('active');
+    vistaReportes.classList.remove('active');
+    navRegistro.classList.remove('active');
+    navReportes.classList.remove('active');
 
-// Iniciar sesión con Google
+    vistaActiva.classList.add('active');
+    linkActivo.classList.add('active');
+}
+
+navRegistro.addEventListener('click', (e) => { e.preventDefault(); cambiarVista(vistaRegistro, navRegistro); });
+navReportes.addEventListener('click', (e) => { e.preventDefault(); cambiarVista(vistaReportes, navReportes); generarReporte(); });
+
+
+// ==========================================
+// 5. AUTENTICACIÓN
+// ==========================================
 btnLogin.addEventListener('click', async () => {
-    const provider = new GoogleAuthProvider();
-    try {
-        await signInWithPopup(auth, provider);
-    } catch (error) {
-        console.error("Error al iniciar sesión:", error);
-        alert("Hubo un error al iniciar sesión.");
-    }
+    try { await signInWithPopup(auth, new GoogleAuthProvider()); }
+    catch (error) { console.error(error); alert("Error al iniciar sesión."); }
 });
 
-// Cerrar sesión
 btnLogout.addEventListener('click', async () => {
-    try {
-        await signOut(auth);
-    } catch (error) {
-        console.error("Error al cerrar sesión:", error);
-    }
+    try { await signOut(auth); } catch (error) { console.error(error); }
 });
 
-// Escuchar cambios en el estado de la sesión
 onAuthStateChanged(auth, (user) => {
     if (user) {
-        // Usuario logueado: Ocultar login, mostrar app
         loginContainer.classList.add('d-none');
         appContainer.classList.remove('d-none');
         userInfo.textContent = `Hola, ${user.displayName}`;
-
-        // Cargar los datos de Firestore
-        cargarTrabajos();
+        cargarDatos();
     } else {
-        // Usuario no logueado: Mostrar login, ocultar app
         loginContainer.classList.remove('d-none');
         appContainer.classList.add('d-none');
     }
 });
 
-// ==========================================
-// 5. LÓGICA DE BASE DE DATOS (FIRESTORE)
-// ==========================================
 
-// Guardar un nuevo trabajo
-salesForm.addEventListener('submit', async (e) => {
-    e.preventDefault(); // Evita que la página se recargue
+// ==========================================
+// 6. BASE DE DATOS (CRUD)
+// ==========================================
+formMovimiento.addEventListener('submit', async (e) => {
+    e.preventDefault();
 
-    // Obtener valores del formulario
-    const cliente = document.getElementById('cliente').value;
-    const descripcion = document.getElementById('descripcion').value;
-    const monto = parseFloat(document.getElementById('monto').value); // Convertir a número
-    const fecha = document.getElementById('fecha').value;
-    const estado = document.getElementById('estado').value;
+    const btnSubmit = formMovimiento.querySelector('button');
+    btnSubmit.disabled = true;
+    btnSubmit.textContent = "Guardando...";
+
+    const nuevoMovimiento = {
+        tipo: document.getElementById('tipo').value,
+        fecha: document.getElementById('fecha').value,
+        descripcion: document.getElementById('descripcion').value,
+        entidad: document.getElementById('entidad').value,
+        monto: parseFloat(document.getElementById('monto').value),
+        timestamp: new Date()
+    };
 
     try {
-        // Deshabilitar el botón temporalmente para evitar dobles envíos
-        const btnSubmit = salesForm.querySelector('button[type="submit"]');
-        btnSubmit.disabled = true;
-        btnSubmit.textContent = "Guardando...";
-
-        // Guardar en la colección "trabajos"
-        await addDoc(collection(db, "trabajos"), {
-            cliente: cliente,
-            descripcion: descripcion,
-            monto: monto,
-            fecha: fecha,
-            estado: estado,
-            creadoEn: new Date() // Marca de tiempo interna
-        });
-
-        // Limpiar el formulario y restaurar el botón
-        salesForm.reset();
-        btnSubmit.disabled = false;
-        btnSubmit.textContent = "Guardar Trabajo";
-
+        await addDoc(collection(db, "movimientos"), nuevoMovimiento);
+        formMovimiento.reset();
+        document.getElementById('fecha').valueAsDate = new Date(); // Restaurar fecha hoy
+        alert("Movimiento guardado con éxito");
     } catch (error) {
-        console.error("Error al guardar:", error);
-        alert("Hubo un error al guardar el trabajo.");
+        console.error(error);
+        alert("Error al guardar");
+    } finally {
+        btnSubmit.disabled = false;
+        btnSubmit.textContent = "Guardar Movimiento";
     }
 });
 
-// Leer y mostrar los trabajos en tiempo real
-function cargarTrabajos() {
-    // Creamos una consulta ordenando por fecha (de más reciente a más antiguo)
-    const q = query(collection(db, "trabajos"), orderBy("fecha", "desc"));
-
-    // onSnapshot escucha los cambios en tiempo real
-    onSnapshot(q, (querySnapshot) => {
-        let tablaHTML = '';
-        let sumaIngresos = 0;
-        let contadorVentas = 0;
-
-        querySnapshot.forEach((doc) => {
-            const trabajo = doc.data();
-
-            // Sumar al dashboard
-            sumaIngresos += trabajo.monto;
-            contadorVentas++;
-
-            // Darle color al estado (Verde para entregado, Amarillo para pendiente)
-            const badgeClass = trabajo.estado === 'Entregado' ? 'bg-success' : 'bg-warning text-dark';
-
-            // Construir la fila de la tabla
-            tablaHTML += `
-                <tr>
-                    <td>${trabajo.fecha}</td>
-                    <td class="fw-bold">${trabajo.cliente}</td>
-                    <td>${trabajo.descripcion}</td>
-                    <td>₡${trabajo.monto.toLocaleString('es-CR')}</td>
-                    <td><span class="badge ${badgeClass}">${trabajo.estado}</span></td>
-                </tr>
-            `;
+function cargarDatos() {
+    const q = query(collection(db, "movimientos"), orderBy("fecha", "desc"));
+    onSnapshot(q, (snapshot) => {
+        listaMovimientos = [];
+        snapshot.forEach((doc) => {
+            listaMovimientos.push(doc.data());
         });
 
-        // Si no hay datos, mostrar un mensaje
-        if (contadorVentas === 0) {
-            tablaHTML = `<tr><td colspan="5" class="text-center text-muted">Aún no hay trabajos registrados.</td></tr>`;
+        // Si estamos en la vista de reportes, actualizar al recibir datos nuevos
+        if (vistaReportes.classList.contains('active')) {
+            generarReporte();
+        }
+    });
+}
+
+
+// ==========================================
+// 7. LÓGICA DE REPORTES Y GRÁFICOS
+// ==========================================
+btnFiltrar.addEventListener('click', generarReporte);
+
+btnLimpiar.addEventListener('click', () => {
+    filtroInicio.value = '';
+    filtroFin.value = '';
+    generarReporte();
+});
+
+function generarReporte() {
+    let datosFiltrados = listaMovimientos;
+    const inicio = filtroInicio.value;
+    const fin = filtroFin.value;
+
+    // Aplicar filtros de fecha si existen
+    if (inicio && fin) {
+        datosFiltrados = listaMovimientos.filter(mov => mov.fecha >= inicio && mov.fecha <= fin);
+    } else if (inicio) {
+        datosFiltrados = listaMovimientos.filter(mov => mov.fecha >= inicio);
+    } else if (fin) {
+        datosFiltrados = listaMovimientos.filter(mov => mov.fecha <= fin);
+    }
+
+    let totalEntradas = 0;
+    let totalSalidas = 0;
+    let htmlTabla = '';
+
+    datosFiltrados.forEach(mov => {
+        if (mov.tipo === 'entrada') {
+            totalEntradas += mov.monto;
+        } else {
+            totalSalidas += mov.monto;
         }
 
-        // Inyectar el HTML en la tabla
-        salesTableBody.innerHTML = tablaHTML;
+        const colorTexto = mov.tipo === 'entrada' ? 'text-success' : 'text-danger';
+        const icono = mov.tipo === 'entrada' ? '+' : '-';
 
-        // Actualizar el Dashboard
-        totalIncomeEl.textContent = `₡ ${sumaIngresos.toLocaleString('es-CR')}`;
-        totalSalesEl.textContent = contadorVentas;
+        htmlTabla += `
+            <tr>
+                <td>${mov.fecha}</td>
+                <td class="${colorTexto} text-capitalize fw-bold">${mov.tipo}</td>
+                <td>
+                    ${mov.descripcion}
+                    <br><small class="text-muted">${mov.entidad}</small>
+                </td>
+                <td class="${colorTexto} fw-bold">${icono} ₡${mov.monto.toLocaleString('es-CR')}</td>
+            </tr>
+        `;
     });
-    
+
+    if (datosFiltrados.length === 0) {
+        htmlTabla = `<tr><td colspan="4" class="text-center text-muted">No hay movimientos en este periodo.</td></tr>`;
+    }
+
+    // Actualizar DOM
+    tablaReportes.innerHTML = htmlTabla;
+    resEntradas.textContent = `₡${totalEntradas.toLocaleString('es-CR')}`;
+    resSalidas.textContent = `₡${totalSalidas.toLocaleString('es-CR')}`;
+    resBalance.textContent = `₡${(totalEntradas - totalSalidas).toLocaleString('es-CR')}`;
+
+    // Actualizar Gráfico
+    dibujarGrafico(totalEntradas, totalSalidas);
+}
+
+function dibujarGrafico(entradas, salidas) {
+    // Si ya existe un gráfico, hay que destruirlo para evitar sobreposición
+    if (graficoInstancia) {
+        graficoInstancia.destroy();
+    }
+
+    // Si todo está en 0, no mostramos el gráfico vacío
+    if (entradas === 0 && salidas === 0) {
+        return;
+    }
+
+    graficoInstancia = new Chart(ctxGrafico, {
+        type: 'doughnut',
+        data: {
+            labels: ['Entradas (Ingresos)', 'Salidas (Gastos)'],
+            datasets: [{
+                data: [entradas, salidas],
+                backgroundColor: ['#198754', '#dc3545'], // Verde Bootstrap y Rojo Bootstrap
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'bottom' }
+            }
+        }
+    });
 }
