@@ -21,30 +21,24 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Variables Globales
 let listaMovimientos = [];
-let graficoInstancia = null; // Para destruir el gráfico viejo antes de dibujar uno nuevo
+let graficoInstancia = null;
 
 // ==========================================
 // 3. REFERENCIAS AL DOM
 // ==========================================
-// Auth
 const loginContainer = document.getElementById('login-container');
 const appContainer = document.getElementById('app-container');
 const btnLogin = document.getElementById('btn-login');
 const btnLogout = document.getElementById('btn-logout');
 const userInfo = document.getElementById('user-info');
 
-// Navegación (Vistas)
 const navRegistro = document.getElementById('nav-registro');
 const navReportes = document.getElementById('nav-reportes');
 const vistaRegistro = document.getElementById('vista-registro');
 const vistaReportes = document.getElementById('vista-reportes');
 
-// Formulario
 const formMovimiento = document.getElementById('form-movimiento');
-
-// Reportes
 const filtroInicio = document.getElementById('filtro-inicio');
 const filtroFin = document.getElementById('filtro-fin');
 const btnFiltrar = document.getElementById('btn-filtrar');
@@ -52,12 +46,10 @@ const btnLimpiar = document.getElementById('btn-limpiar');
 const tablaReportes = document.getElementById('tabla-reportes');
 const ctxGrafico = document.getElementById('miGrafico').getContext('2d');
 
-// Resúmenes numéricos
 const resEntradas = document.getElementById('resumen-entradas');
 const resSalidas = document.getElementById('resumen-salidas');
 const resBalance = document.getElementById('resumen-balance');
 
-// Establecer fecha de hoy por defecto en el formulario
 document.getElementById('fecha').valueAsDate = new Date();
 
 // ==========================================
@@ -78,15 +70,36 @@ navReportes.addEventListener('click', (e) => { e.preventDefault(); cambiarVista(
 
 
 // ==========================================
-// 5. AUTENTICACIÓN
+// 5. AUTENTICACIÓN CON SWEETALERT
 // ==========================================
 btnLogin.addEventListener('click', async () => {
-    try { await signInWithPopup(auth, new GoogleAuthProvider()); }
-    catch (error) { console.error(error); alert("Error al iniciar sesión."); }
+    try {
+        await signInWithPopup(auth, new GoogleAuthProvider());
+    }
+    catch (error) {
+        console.error(error);
+        Swal.fire({ icon: 'error', title: 'Oops...', text: 'Hubo un error al iniciar sesión.' });
+    }
 });
 
 btnLogout.addEventListener('click', async () => {
-    try { await signOut(auth); } catch (error) { console.error(error); }
+    try {
+        // Preguntar antes de salir
+        const result = await Swal.fire({
+            title: '¿Cerrar sesión?',
+            text: "Tendrás que volver a ingresar con Google.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Sí, salir',
+            cancelButtonText: 'Cancelar'
+        });
+
+        if (result.isConfirmed) {
+            await signOut(auth);
+        }
+    } catch (error) { console.error(error); }
 });
 
 onAuthStateChanged(auth, (user) => {
@@ -110,11 +123,14 @@ formMovimiento.addEventListener('submit', async (e) => {
 
     const btnSubmit = formMovimiento.querySelector('button');
     btnSubmit.disabled = true;
-    btnSubmit.textContent = "Guardando...";
+    btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Guardando...';
 
+    // Construir objeto con los nuevos campos
     const nuevoMovimiento = {
         tipo: document.getElementById('tipo').value,
         fecha: document.getElementById('fecha').value,
+        categoria: document.getElementById('categoria').value,
+        cantidad: parseFloat(document.getElementById('cantidad').value),
         descripcion: document.getElementById('descripcion').value,
         entidad: document.getElementById('entidad').value,
         monto: parseFloat(document.getElementById('monto').value),
@@ -123,12 +139,22 @@ formMovimiento.addEventListener('submit', async (e) => {
 
     try {
         await addDoc(collection(db, "movimientos"), nuevoMovimiento);
+
+        // Resetear form y mostrar alerta de éxito
         formMovimiento.reset();
-        document.getElementById('fecha').valueAsDate = new Date(); // Restaurar fecha hoy
-        alert("Movimiento guardado con éxito");
+        document.getElementById('fecha').valueAsDate = new Date();
+
+        Swal.fire({
+            icon: 'success',
+            title: '¡Guardado!',
+            text: 'El movimiento se registró correctamente.',
+            timer: 2000,
+            showConfirmButton: false
+        });
+
     } catch (error) {
         console.error(error);
-        alert("Error al guardar");
+        Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo guardar el registro en la base de datos.' });
     } finally {
         btnSubmit.disabled = false;
         btnSubmit.textContent = "Guardar Movimiento";
@@ -143,7 +169,6 @@ function cargarDatos() {
             listaMovimientos.push(doc.data());
         });
 
-        // Si estamos en la vista de reportes, actualizar al recibir datos nuevos
         if (vistaReportes.classList.contains('active')) {
             generarReporte();
         }
@@ -167,7 +192,6 @@ function generarReporte() {
     const inicio = filtroInicio.value;
     const fin = filtroFin.value;
 
-    // Aplicar filtros de fecha si existen
     if (inicio && fin) {
         datosFiltrados = listaMovimientos.filter(mov => mov.fecha >= inicio && mov.fecha <= fin);
     } else if (inicio) {
@@ -181,49 +205,48 @@ function generarReporte() {
     let htmlTabla = '';
 
     datosFiltrados.forEach(mov => {
-        if (mov.tipo === 'entrada') {
-            totalEntradas += mov.monto;
-        } else {
-            totalSalidas += mov.monto;
-        }
+        if (mov.tipo === 'entrada') { totalEntradas += mov.monto; }
+        else { totalSalidas += mov.monto; }
 
         const colorTexto = mov.tipo === 'entrada' ? 'text-success' : 'text-danger';
-        const icono = mov.tipo === 'entrada' ? '+' : '-';
+        const icono = mov.tipo === 'entrada' ? 'fa-arrow-up' : 'fa-arrow-down';
+        const colorBadge = mov.tipo === 'entrada' ? 'bg-success' : 'bg-danger';
 
+        // Estructurando la nueva vista de la tabla
         htmlTabla += `
             <tr>
-                <td>${mov.fecha}</td>
-                <td class="${colorTexto} text-capitalize fw-bold">${mov.tipo}</td>
+                <td class="text-nowrap">${mov.fecha}</td>
                 <td>
-                    ${mov.descripcion}
-                    <br><small class="text-muted">${mov.entidad}</small>
+                    <span class="badge bg-dark mb-1">${mov.categoria}</span>
+                    <span class="badge ${colorBadge} mb-1">Cant: ${mov.cantidad}</span>
+                    <br>
+                    <strong>${mov.descripcion}</strong>
+                    <br><small class="text-muted">${mov.entidad ? 'Ref: ' + mov.entidad : ''}</small>
                 </td>
-                <td class="${colorTexto} fw-bold">${icono} ₡${mov.monto.toLocaleString('es-CR')}</td>
+                <td class="${colorTexto} fw-bold text-nowrap">
+                    ${mov.tipo === 'entrada' ? '+' : '-'} ₡${mov.monto.toLocaleString('es-CR')}
+                </td>
             </tr>
         `;
     });
 
     if (datosFiltrados.length === 0) {
-        htmlTabla = `<tr><td colspan="4" class="text-center text-muted">No hay movimientos en este periodo.</td></tr>`;
+        htmlTabla = `<tr><td colspan="3" class="text-center text-muted py-4">No hay movimientos en este periodo.</td></tr>`;
     }
 
-    // Actualizar DOM
     tablaReportes.innerHTML = htmlTabla;
     resEntradas.textContent = `₡${totalEntradas.toLocaleString('es-CR')}`;
     resSalidas.textContent = `₡${totalSalidas.toLocaleString('es-CR')}`;
     resBalance.textContent = `₡${(totalEntradas - totalSalidas).toLocaleString('es-CR')}`;
 
-    // Actualizar Gráfico
     dibujarGrafico(totalEntradas, totalSalidas);
 }
 
 function dibujarGrafico(entradas, salidas) {
-    // Si ya existe un gráfico, hay que destruirlo para evitar sobreposición
     if (graficoInstancia) {
         graficoInstancia.destroy();
     }
 
-    // Si todo está en 0, no mostramos el gráfico vacío
     if (entradas === 0 && salidas === 0) {
         return;
     }
@@ -234,15 +257,13 @@ function dibujarGrafico(entradas, salidas) {
             labels: ['Entradas (Ingresos)', 'Salidas (Gastos)'],
             datasets: [{
                 data: [entradas, salidas],
-                backgroundColor: ['#198754', '#dc3545'], // Verde Bootstrap y Rojo Bootstrap
+                backgroundColor: ['#198754', '#dc3545'],
                 hoverOffset: 4
             }]
         },
         options: {
             responsive: true,
-            plugins: {
-                legend: { position: 'bottom' }
-            }
+            plugins: { legend: { position: 'bottom' } }
         }
     });
 }
