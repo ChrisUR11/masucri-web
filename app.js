@@ -132,13 +132,12 @@ document.getElementById('form-pedido').addEventListener('submit', async (e) => {
     e.preventDefault();
     const id = document.getElementById('ped-id').value;
 
-    // Si dejan vacío, se guarda como string vacío o 0
     const fEntrega = document.getElementById('ped-entrega').value;
     const precioVal = parseFloat(document.getElementById('ped-precio').value) || 0;
 
     const datos = {
         fecha_solicitud: document.getElementById('ped-solicitado').value,
-        fecha_entrega: fEntrega, // Puede ir vacío
+        fecha_entrega: fEntrega,
         cliente: document.getElementById('ped-cliente').value.trim(),
         producto: document.getElementById('ped-producto').value.trim(),
         descripcion: document.getElementById('ped-desc').value.trim(),
@@ -172,7 +171,6 @@ function renderizarPedidos() {
     if (!vistas.pedidos.classList.contains('active')) return;
     let pendientes = listaPedidos.filter(p => p.estado === 'Pendiente');
 
-    // Filtros
     const txt = document.getElementById('filtro-pedido-texto').value.toLowerCase();
     const fSol = document.getElementById('filtro-pedido-solicitud').value;
     const fEnt = document.getElementById('filtro-pedido-entrega').value;
@@ -188,7 +186,6 @@ function renderizarPedidos() {
     pendientes.forEach(ped => {
         let badgeClass = '', prioridadTxt = '';
 
-        // Manejo de Fecha Pendiente
         if (!ped.fecha_entrega) {
             badgeClass = 'bg-secondary';
             prioridadTxt = 'Sin Fecha';
@@ -252,7 +249,6 @@ window.entregarPedido = async (id) => {
 
     let precioActual = ped.precio;
 
-    // Si el precio estaba pendiente, obligar a ponerlo antes de entregar
     if (!precioActual || precioActual === 0) {
         const { value: nuevoPrecio } = await Swal.fire({
             title: 'Fijar Precio Final',
@@ -263,12 +259,10 @@ window.entregarPedido = async (id) => {
         });
         if (!nuevoPrecio) return;
         precioActual = parseFloat(nuevoPrecio);
-        // Actualizamos el precio en la BD
         await updateDoc(doc(db, "pedidos", id), { precio: precioActual });
         ped.precio = precioActual;
     }
 
-    // Preguntar por el pago
     const resPago = await Swal.fire({
         title: 'Entregar Pedido',
         html: `Precio Total: <h3 class="text-success">₡${precioActual.toLocaleString('es-CR')}</h3><br>¿El cliente pagó la totalidad?`,
@@ -283,7 +277,6 @@ window.entregarPedido = async (id) => {
     if (resPago.isConfirmed) {
         montoCobrado = precioActual;
     } else if (resPago.isDenied) {
-        // Se quitó el validador máximo para permitir propinas o montos mayores libres
         const { value: montoIngresado } = await Swal.fire({
             title: 'Monto Recibido', input: 'number',
             inputLabel: 'Ingrese la cantidad en colones que el cliente pagó hoy:',
@@ -340,17 +333,16 @@ function renderizarHistorialPedidos() {
 
         if (ped.estado === 'Entregado') {
             if (deuda > 0) {
-                // Debe plata
                 badge = 'bg-warning text-dark';
                 estadoTxt = 'Con Saldo';
                 txtPago += `<br><small class="text-danger fw-bold">Debe: ₡${deuda.toLocaleString('es-CR')}</small>`;
-                btnAbonar = `<button class="btn btn-sm btn-success w-100 mt-1" onclick="window.abonarPedido('${ped.id}')">💰 Abonar</button>`;
+                btnAbonar = `<button class="btn btn-sm btn-success w-100 mt-1 mb-1" onclick="window.abonarPedido('${ped.id}')">💰 Abonar</button>`;
             } else if (deuda < 0) {
-                // Pagó de más (Propina)
                 txtPago += `<br><small class="text-success fw-bold">+ Propina: ₡${Math.abs(deuda).toLocaleString('es-CR')}</small>`;
             }
         }
 
+        // Se agregó el botón de borrar aquí
         html += `
             <tr>
                 <td><span class="badge ${badge}">${estadoTxt}</span></td>
@@ -358,7 +350,10 @@ function renderizarHistorialPedidos() {
                 <td class="fw-bold">${ped.cliente}</td>
                 <td>${ped.producto}</td>
                 <td>${ped.estado === 'Cancelado' ? '-' : txtPago}</td>
-                <td class="text-center align-middle">${btnAbonar}</td>
+                <td class="text-center align-middle">
+                    ${btnAbonar}
+                    <button class="btn btn-sm btn-outline-danger w-100" onclick="window.borrarHistorialPedido('${ped.id}')" title="Eliminar del Historial">🗑️ Borrar</button>
+                </td>
             </tr>
         `;
     });
@@ -384,10 +379,8 @@ window.abonarPedido = async (id) => {
             const montoAbono = parseFloat(abono);
             const nuevoPagado = (ped.monto_pagado || 0) + montoAbono;
 
-            // Actualizar pedido
             await updateDoc(doc(db, "pedidos", id), { monto_pagado: nuevoPagado });
 
-            // Registrar ingreso a caja
             await addDoc(collection(db, "movimientos"), {
                 tipo: 'entrada',
                 fecha: new Date().toISOString().split('T')[0],
@@ -400,6 +393,29 @@ window.abonarPedido = async (id) => {
             Swal.fire('¡Éxito!', 'Abono registrado en caja.', 'success');
         } catch (e) {
             Swal.fire('Error', 'No se pudo guardar el abono.', 'error');
+        }
+    }
+};
+
+// NUEVA FUNCIÓN: BORRAR DEL HISTORIAL
+window.borrarHistorialPedido = async (id) => {
+    const result = await Swal.fire({
+        title: '¿Eliminar del historial?',
+        text: "Esta acción borrará el pedido permanentemente. Los registros financieros en la caja NO se borrarán automáticamente.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Sí, borrar definitivamente',
+        cancelButtonText: 'Cancelar'
+    });
+
+    if (result.isConfirmed) {
+        try {
+            await deleteDoc(doc(db, "pedidos", id));
+            Swal.fire({ icon: 'success', title: 'Borrado', timer: 1500, showConfirmButton: false });
+        } catch (error) {
+            Swal.fire('Error', 'No se pudo eliminar el pedido.', 'error');
         }
     }
 };
@@ -475,7 +491,6 @@ function generarReporteFinanciero() {
     dibujarGraficoFinanciero(tEntradas, tSalidas, filtroModo.value);
 }
 
-// LÓGICA EDITAR / BORRAR MOVIMIENTOS FINANCIEROS
 window.editarMov = (id) => {
     const mov = listaMovimientos.find(m => m.id === id);
     if (!mov) return;
