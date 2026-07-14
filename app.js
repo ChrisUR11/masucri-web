@@ -3,10 +3,10 @@
 // ==========================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
 // ==========================================
-// 2. CONFIGURACIÓN
+// 2. CONFIGURACIÓN Y SEGURIDAD
 // ==========================================
 const firebaseConfig = {
     apiKey: "AIzaSyD_p1cLfHMoSugrfPrCJPuHJKEMIH7AvV8",
@@ -21,359 +21,420 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// ==========================================
-// 3. SEGURIDAD: CORREOS PERMITIDOS
-// ==========================================
 const CORREOS_PERMITIDOS = [
     "ulloarodriguezchris@gmail.com",
     "anisrmj5@gmail.com"
 ];
 
+// Variables Globales
 let listaMovimientos = [];
-let datosParaExportar = [];
+let listaPedidos = [];
 let graficoInstancia = null;
-let modalInstancia = null;
+let modalPedidoInstancia = null;
 
-// Referencias DOM
+// Referencias DOM Generales
 const loginContainer = document.getElementById('login-container');
 const appContainer = document.getElementById('app-container');
-const btnLogin = document.getElementById('btn-login');
-const btnLogout = document.getElementById('btn-logout');
 const userInfo = document.getElementById('user-info');
 
-const navRegistro = document.getElementById('nav-registro');
-const navReportes = document.getElementById('nav-reportes');
-const vistaRegistro = document.getElementById('vista-registro');
-const vistaReportes = document.getElementById('vista-reportes');
+// Vistas y Navegación
+const vistas = {
+    pedidos: document.getElementById('vista-pedidos'),
+    historial: document.getElementById('vista-historial'),
+    registro: document.getElementById('vista-registro'),
+    reportes: document.getElementById('vista-reportes')
+};
+const navLinks = {
+    pedidos: document.getElementById('nav-pedidos'),
+    historial: document.getElementById('nav-historial'),
+    registro: document.getElementById('nav-registro'),
+    reportes: document.getElementById('nav-reportes')
+};
 
-const formMovimiento = document.getElementById('form-movimiento');
-const formEditar = document.getElementById('form-editar');
+function cambiarVista(vistaActiva) {
+    Object.values(vistas).forEach(v => v.classList.remove('active'));
+    Object.values(navLinks).forEach(n => n.classList.remove('active'));
 
-const busquedaTexto = document.getElementById('busqueda-texto');
-const filtroModo = document.getElementById('filtro-modo');
-const filtroInicio = document.getElementById('filtro-inicio');
-const filtroFin = document.getElementById('filtro-fin');
-const btnLimpiar = document.getElementById('btn-limpiar');
-const tablaReportes = document.getElementById('tabla-reportes');
-const ctxGrafico = document.getElementById('miGrafico').getContext('2d');
+    vistas[vistaActiva].classList.add('active');
+    navLinks[vistaActiva].classList.add('active');
 
-const btnExportPdf = document.getElementById('btn-export-pdf');
-const btnExportExcel = document.getElementById('btn-export-excel');
-
-const cardEntradas = document.getElementById('card-entradas');
-const cardSalidas = document.getElementById('card-salidas');
-const cardBalance = document.getElementById('card-balance');
-const resEntradas = document.getElementById('resumen-entradas');
-const resSalidas = document.getElementById('resumen-salidas');
-const resBalance = document.getElementById('resumen-balance');
-
-document.getElementById('fecha').valueAsDate = new Date();
-
-// ==========================================
-// 4. SISTEMA DE NAVEGACIÓN
-// ==========================================
-function cambiarVista(vistaActiva, linkActivo) {
-    vistaRegistro.classList.remove('active');
-    vistaReportes.classList.remove('active');
-    navRegistro.classList.remove('active');
-    navReportes.classList.remove('active');
-    vistaActiva.classList.add('active');
-    linkActivo.classList.add('active');
+    if (vistaActiva === 'reportes') generarReporteFinanciero();
+    if (vistaActiva === 'pedidos') renderizarPedidos();
 }
 
-navRegistro.addEventListener('click', (e) => { e.preventDefault(); cambiarVista(vistaRegistro, navRegistro); });
-navReportes.addEventListener('click', (e) => { e.preventDefault(); cambiarVista(vistaReportes, navReportes); generarReporte(); });
+Object.keys(navLinks).forEach(key => {
+    navLinks[key].addEventListener('click', (e) => { e.preventDefault(); cambiarVista(key); });
+});
 
 // ==========================================
-// 5. AUTENTICACIÓN ESTRICTA
+// 3. AUTENTICACIÓN ESTRICTA
 // ==========================================
-btnLogin.addEventListener('click', async () => {
-    try {
-        await signInWithPopup(auth, new GoogleAuthProvider());
-    } catch (error) {
-        Swal.fire({ icon: 'error', title: 'Oops...', text: 'Hubo un error al iniciar sesión.' });
+document.getElementById('btn-login').addEventListener('click', async () => {
+    try { await signInWithPopup(auth, new GoogleAuthProvider()); }
+    catch (e) { Swal.fire('Error', 'Hubo un error al iniciar sesión.', 'error'); }
+});
+
+document.getElementById('btn-logout').addEventListener('click', async () => {
+    if ((await Swal.fire({ title: '¿Cerrar sesión?', icon: 'warning', showCancelButton: true })).isConfirmed) {
+        await signOut(auth);
     }
 });
 
-btnLogout.addEventListener('click', async () => {
-    const result = await Swal.fire({
-        title: '¿Cerrar sesión?', icon: 'warning',
-        showCancelButton: true, confirmButtonColor: '#d33', cancelButtonColor: '#3085d6',
-        confirmButtonText: 'Sí, salir', cancelButtonText: 'Cancelar'
-    });
-    if (result.isConfirmed) { await signOut(auth); }
-});
-
 onAuthStateChanged(auth, async (user) => {
-    if (user) {
-        // Verificar si el correo está en la lista permitida
-        if (CORREOS_PERMITIDOS.includes(user.email)) {
-            // ACCESO PERMITIDO
-            loginContainer.classList.add('d-none');
-            appContainer.classList.remove('d-none');
-            appContainer.classList.add('d-flex'); // Para el footer
-            userInfo.textContent = `Admin: ${user.displayName}`;
-            modalInstancia = new bootstrap.Modal(document.getElementById('modalEditar'));
-            cargarDatos();
-        } else {
-            // ACCESO DENEGADO
-            await signOut(auth);
-            Swal.fire({
-                icon: 'error',
-                title: 'Acceso Denegado',
-                text: 'No tienes permisos de administrador para entrar a este sistema.'
-            });
-        }
+    if (user && CORREOS_PERMITIDOS.includes(user.email)) {
+        loginContainer.classList.add('d-none');
+        appContainer.classList.remove('d-none');
+        appContainer.classList.add('d-flex');
+        userInfo.textContent = `Admin: ${user.displayName}`;
+
+        modalPedidoInstancia = new bootstrap.Modal(document.getElementById('modalPedido'));
+
+        // Cargar Base de Datos
+        cargarPedidos();
+        cargarFinanzas();
+
+        // Vista por defecto
+        cambiarVista('pedidos');
+    } else if (user) {
+        await signOut(auth);
+        Swal.fire({ icon: 'error', title: 'Acceso Denegado', text: 'No tienes permisos para este sistema.' });
     } else {
-        // Usuario desconectado
         loginContainer.classList.remove('d-none');
         appContainer.classList.add('d-none');
         appContainer.classList.remove('d-flex');
     }
 });
 
+
 // ==========================================
-// 6. CREAR, CARGAR, EDITAR Y BORRAR
+// 4. MÓDULO: GESTIÓN DE PEDIDOS
 // ==========================================
-formMovimiento.addEventListener('submit', async (e) => {
+function cargarPedidos() {
+    const q = query(collection(db, "pedidos"), orderBy("fecha_entrega", "asc"));
+    onSnapshot(q, (snapshot) => {
+        listaPedidos = [];
+        snapshot.forEach(doc => listaPedidos.push({ id: doc.id, ...doc.data() }));
+        renderizarPedidos();
+        renderizarHistorialPedidos();
+    });
+}
+
+// Lógica para el Modal de Pedido
+window.abrirModalPedido = (id = null) => {
+    const form = document.getElementById('form-pedido');
+    form.reset();
+    document.getElementById('ped-id').value = '';
+
+    // Auto-completar fecha de hoy para nuevo pedido
+    const hoy = new Date().toISOString().split('T')[0];
+    document.getElementById('ped-solicitado').value = hoy;
+    document.getElementById('ped-entrega').value = hoy;
+    document.getElementById('tituloModalPedido').textContent = 'Nuevo Pedido';
+
+    if (id) {
+        const ped = listaPedidos.find(p => p.id === id);
+        if (ped) {
+            document.getElementById('tituloModalPedido').textContent = 'Editar Pedido';
+            document.getElementById('ped-id').value = ped.id;
+            document.getElementById('ped-solicitado').value = ped.fecha_solicitud;
+            document.getElementById('ped-entrega').value = ped.fecha_entrega;
+            document.getElementById('ped-cliente').value = ped.cliente;
+            document.getElementById('ped-producto').value = ped.producto;
+            document.getElementById('ped-desc').value = ped.descripcion || '';
+            document.getElementById('ped-precio').value = ped.precio;
+        }
+    }
+    modalPedidoInstancia.show();
+}
+
+// Guardar / Editar Pedido
+document.getElementById('form-pedido').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const descripcionStr = document.getElementById('descripcion').value.trim();
-    const montoNum = parseFloat(document.getElementById('monto').value);
+    const id = document.getElementById('ped-id').value;
+    const datos = {
+        fecha_solicitud: document.getElementById('ped-solicitado').value,
+        fecha_entrega: document.getElementById('ped-entrega').value,
+        cliente: document.getElementById('ped-cliente').value.trim(),
+        producto: document.getElementById('ped-producto').value.trim(),
+        descripcion: document.getElementById('ped-desc').value.trim(),
+        precio: parseFloat(document.getElementById('ped-precio').value),
+    };
 
-    if (descripcionStr === "") return Swal.fire({ icon: 'warning', title: 'Atención', text: 'El concepto no puede estar vacío.' });
-    if (isNaN(montoNum) || montoNum <= 0) return Swal.fire({ icon: 'warning', title: 'Atención', text: 'El monto debe ser mayor a cero.' });
+    if (datos.fecha_entrega < datos.fecha_solicitud) {
+        return Swal.fire('Error', 'La fecha de entrega no puede ser menor a la de solicitud.', 'error');
+    }
 
-    const btnSubmit = formMovimiento.querySelector('button');
+    const btnSubmit = e.target.querySelector('button');
     btnSubmit.disabled = true;
 
     try {
-        await addDoc(collection(db, "movimientos"), {
-            tipo: document.getElementById('tipo').value,
-            fecha: document.getElementById('fecha').value,
-            descripcion: descripcionStr,
-            entidad: document.getElementById('entidad').value.trim(),
-            monto: montoNum,
-            timestamp: new Date()
-        });
-        formMovimiento.reset();
-        document.getElementById('fecha').valueAsDate = new Date();
-        Swal.fire({ icon: 'success', title: '¡Guardado!', timer: 1500, showConfirmButton: false });
-    } catch (error) {
-        Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo guardar.' });
+        if (id) {
+            await updateDoc(doc(db, "pedidos", id), datos);
+            Swal.fire({ icon: 'success', title: 'Actualizado', timer: 1000, showConfirmButton: false });
+        } else {
+            datos.estado = 'Pendiente';
+            datos.timestamp = new Date();
+            await addDoc(collection(db, "pedidos"), datos);
+            Swal.fire({ icon: 'success', title: 'Pedido Guardado', timer: 1000, showConfirmButton: false });
+        }
+        modalPedidoInstancia.hide();
+    } catch (e) {
+        Swal.fire('Error', 'No se pudo guardar.', 'error');
     } finally {
         btnSubmit.disabled = false;
     }
 });
 
-function cargarDatos() {
-    const q = query(collection(db, "movimientos"), orderBy("fecha", "desc"));
-    onSnapshot(q, (snapshot) => {
-        listaMovimientos = [];
-        snapshot.forEach((doc) => { listaMovimientos.push({ id: doc.id, ...doc.data() }); });
-        if (vistaReportes.classList.contains('active')) generarReporte();
-    });
-}
+// Renderizar Tabla de Pendientes (Con motor de Prioridad)
+function renderizarPedidos() {
+    if (!vistas.pedidos.classList.contains('active')) return;
 
-tablaReportes.addEventListener('click', (e) => {
-    if (e.target.closest('.btn-editar')) abrirModalEdicion(e.target.closest('.btn-editar').dataset.id);
-    if (e.target.closest('.btn-borrar')) borrarMovimiento(e.target.closest('.btn-borrar').dataset.id);
-});
+    let pendientes = listaPedidos.filter(p => p.estado === 'Pendiente');
 
-function abrirModalEdicion(id) {
-    const mov = listaMovimientos.find(m => m.id === id);
-    if (!mov) return;
-    document.getElementById('edit-id').value = mov.id;
-    document.getElementById('edit-tipo').value = mov.tipo;
-    document.getElementById('edit-fecha').value = mov.fecha;
-    document.getElementById('edit-descripcion').value = mov.descripcion;
-    document.getElementById('edit-entidad').value = mov.entidad || '';
-    document.getElementById('edit-monto').value = mov.monto;
-    modalInstancia.show();
-}
+    // Aplicar Filtros de Pedidos
+    const txt = document.getElementById('filtro-pedido-texto').value.toLowerCase();
+    const fSol = document.getElementById('filtro-pedido-solicitud').value;
+    const fEnt = document.getElementById('filtro-pedido-entrega').value;
 
-formEditar.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const descripcionStr = document.getElementById('edit-descripcion').value.trim();
-    const montoNum = parseFloat(document.getElementById('edit-monto').value);
+    if (txt) pendientes = pendientes.filter(p => p.cliente.toLowerCase().includes(txt) || p.producto.toLowerCase().includes(txt));
+    if (fSol) pendientes = pendientes.filter(p => p.fecha_solicitud >= fSol);
+    if (fEnt) pendientes = pendientes.filter(p => p.fecha_entrega <= fEnt);
 
-    if (descripcionStr === "") return Swal.fire({ icon: 'warning', title: 'Atención', text: 'El concepto no puede estar vacío.' });
-    if (isNaN(montoNum) || montoNum <= 0) return Swal.fire({ icon: 'warning', title: 'Atención', text: 'El monto debe ser mayor a cero.' });
+    const tbody = document.getElementById('tabla-pedidos');
+    let html = '';
 
-    try {
-        await updateDoc(doc(db, "movimientos", document.getElementById('edit-id').value), {
-            tipo: document.getElementById('edit-tipo').value,
-            fecha: document.getElementById('edit-fecha').value,
-            descripcion: descripcionStr,
-            entidad: document.getElementById('edit-entidad').value.trim(),
-            monto: montoNum
-        });
-        modalInstancia.hide();
-        Swal.fire({ icon: 'success', title: 'Actualizado', timer: 1500, showConfirmButton: false });
-    } catch (error) { Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo actualizar.' }); }
-});
+    // Fecha actual para calcular prioridad a las 00:00 hrs
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
 
-async function borrarMovimiento(id) {
-    const result = await Swal.fire({
-        title: '¿Eliminar registro?', text: "Esta acción no se puede deshacer.", icon: 'warning',
-        showCancelButton: true, confirmButtonColor: '#d33', cancelButtonColor: '#3085d6', confirmButtonText: 'Sí, borrar', cancelButtonText: 'Cancelar'
-    });
-    if (result.isConfirmed) {
-        try { await deleteDoc(doc(db, "movimientos", id)); Swal.fire({ icon: 'success', title: 'Borrado', timer: 1500, showConfirmButton: false }); }
-        catch (error) { Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo eliminar.' }); }
-    }
-}
+    pendientes.forEach(ped => {
+        // Cálculo de Prioridad
+        const fechaEntrega = new Date(ped.fecha_entrega + 'T00:00:00'); // Evitar desfase de zona horaria
+        const diffTime = fechaEntrega - hoy;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-// ==========================================
-// 7. LÓGICA DE REPORTES EN TIEMPO REAL
-// ==========================================
-busquedaTexto.addEventListener('input', generarReporte);
-filtroModo.addEventListener('change', generarReporte);
-filtroInicio.addEventListener('change', generarReporte);
-filtroFin.addEventListener('change', generarReporte);
+        let badgeClass = '', prioridadTxt = '';
+        if (diffDays < 0) { badgeClass = 'bg-danger'; prioridadTxt = 'Atrasado'; }
+        else if (diffDays === 0) { badgeClass = 'bg-danger'; prioridadTxt = 'Para Hoy'; }
+        else if (diffDays <= 2) { badgeClass = 'bg-warning text-dark'; prioridadTxt = 'Alta'; }
+        else if (diffDays <= 5) { badgeClass = 'bg-info text-dark'; prioridadTxt = 'Media'; }
+        else { badgeClass = 'bg-success'; prioridadTxt = 'Baja'; }
 
-btnLimpiar.addEventListener('click', () => {
-    busquedaTexto.value = ''; filtroInicio.value = ''; filtroFin.value = ''; filtroModo.value = 'ambos';
-    generarReporte();
-});
-
-function generarReporte() {
-    let datosFiltrados = listaMovimientos;
-    const texto = busquedaTexto.value.toLowerCase().trim();
-    const inicio = filtroInicio.value;
-    const fin = filtroFin.value;
-    const modo = filtroModo.value;
-
-    cardEntradas.classList.toggle('d-none', modo === 'salidas');
-    cardSalidas.classList.toggle('d-none', modo === 'entradas');
-    cardBalance.classList.toggle('d-none', modo !== 'ambos');
-
-    if (texto) {
-        datosFiltrados = datosFiltrados.filter(mov =>
-            mov.descripcion.toLowerCase().includes(texto) ||
-            (mov.entidad && mov.entidad.toLowerCase().includes(texto))
-        );
-    }
-
-    if (inicio && fin) datosFiltrados = datosFiltrados.filter(mov => mov.fecha >= inicio && mov.fecha <= fin);
-    else if (inicio) datosFiltrados = datosFiltrados.filter(mov => mov.fecha >= inicio);
-    else if (fin) datosFiltrados = datosFiltrados.filter(mov => mov.fecha <= fin);
-
-    if (modo === 'entradas') datosFiltrados = datosFiltrados.filter(mov => mov.tipo === 'entrada');
-    if (modo === 'salidas') datosFiltrados = datosFiltrados.filter(mov => mov.tipo === 'salida');
-
-    datosParaExportar = datosFiltrados;
-
-    let totalEntradas = 0; let totalSalidas = 0; let htmlTabla = '';
-
-    datosFiltrados.forEach(mov => {
-        if (mov.tipo === 'entrada') totalEntradas += mov.monto;
-        else totalSalidas += mov.monto;
-
-        const colorTexto = mov.tipo === 'entrada' ? 'text-success' : 'text-danger';
-        const icono = mov.tipo === 'entrada' ? '+' : '-';
-
-        htmlTabla += `
+        html += `
             <tr>
-                <td class="text-nowrap">${mov.fecha}</td>
+                <td><span class="badge ${badgeClass} w-100 py-2">${prioridadTxt}</span></td>
+                <td class="small">
+                    <span class="text-muted d-block">Sol: ${ped.fecha_solicitud}</span>
+                    <strong class="text-primary d-block">Ent: ${ped.fecha_entrega}</strong>
+                </td>
+                <td class="fw-bold">${ped.cliente}</td>
                 <td>
-                    <strong>${mov.descripcion}</strong>
-                    <br><small class="text-muted">${mov.entidad ? mov.entidad : ''}</small>
+                    ${ped.producto}
+                    ${ped.descripcion ? `<br><small class="text-muted">${ped.descripcion}</small>` : ''}
                 </td>
-                <td class="${colorTexto} fw-bold text-nowrap">
-                    ${icono} ₡${mov.monto.toLocaleString('es-CR')}
-                </td>
+                <td class="fw-bold">₡${ped.precio.toLocaleString('es-CR')}</td>
                 <td class="text-center text-nowrap">
-                    <button class="btn btn-sm btn-outline-secondary btn-editar me-1" data-id="${mov.id}" title="Editar">✏️</button>
-                    <button class="btn btn-sm btn-outline-danger btn-borrar" data-id="${mov.id}" title="Borrar">🗑️</button>
+                    <button class="btn btn-outline-success btn-accion" onclick="window.entregarPedido('${ped.id}')" title="Marcar Entregado">✅</button>
+                    <button class="btn btn-outline-secondary btn-accion" onclick="window.abrirModalPedido('${ped.id}')" title="Editar">✏️</button>
+                    <button class="btn btn-outline-danger btn-accion" onclick="window.cancelarPedido('${ped.id}')" title="Cancelar Pedido">❌</button>
                 </td>
             </tr>
         `;
     });
 
-    if (datosFiltrados.length === 0) {
-        htmlTabla = `<tr><td colspan="4" class="text-center text-muted py-4">No hay datos para mostrar con estos filtros.</td></tr>`;
-    }
-
-    tablaReportes.innerHTML = htmlTabla;
-    resEntradas.textContent = `₡${totalEntradas.toLocaleString('es-CR')}`;
-    resSalidas.textContent = `₡${totalSalidas.toLocaleString('es-CR')}`;
-    resBalance.textContent = `₡${(totalEntradas - totalSalidas).toLocaleString('es-CR')}`;
-
-    dibujarGrafico(totalEntradas, totalSalidas, modo);
+    tbody.innerHTML = html || '<tr><td colspan="6" class="text-center py-4 text-muted">No hay pedidos pendientes que coincidan con la búsqueda.</td></tr>';
 }
 
-function dibujarGrafico(entradas, salidas, modo) {
+// Filtros en tiempo real
+['filtro-pedido-texto', 'filtro-pedido-solicitud', 'filtro-pedido-entrega'].forEach(id => {
+    document.getElementById(id).addEventListener('input', renderizarPedidos);
+});
+document.getElementById('btn-limpiar-pedidos').addEventListener('click', () => {
+    document.getElementById('filtro-pedido-texto').value = '';
+    document.getElementById('filtro-pedido-solicitud').value = '';
+    document.getElementById('filtro-pedido-entrega').value = '';
+    renderizarPedidos();
+});
+
+// Cancelar Pedido
+window.cancelarPedido = async (id) => {
+    if ((await Swal.fire({ title: '¿Cancelar este pedido?', text: 'Pasará al historial como cancelado.', icon: 'warning', showCancelButton: true })).isConfirmed) {
+        await updateDoc(doc(db, "pedidos", id), { estado: 'Cancelado', fecha_cierre: new Date().toISOString().split('T')[0] });
+    }
+};
+
+// ==========================================
+// 5. FLUJO DE ENTREGA Y PAGO
+// ==========================================
+window.entregarPedido = async (id) => {
+    const ped = listaPedidos.find(p => p.id === id);
+    if (!ped) return;
+
+    // 1. Preguntar si pagó todo
+    const resPago = await Swal.fire({
+        title: 'Entregar Pedido',
+        html: `¿El cliente <b>${ped.cliente}</b> canceló la totalidad del pedido?<br><br><h3 class="text-success">₡${ped.precio.toLocaleString('es-CR')}</h3>`,
+        icon: 'question',
+        showDenyButton: true,
+        showCancelButton: true,
+        confirmButtonText: 'Sí, pagó todo',
+        denyButtonText: 'No, abonó una parte',
+        cancelButtonText: 'Cancelar acción',
+        confirmButtonColor: '#198754',
+        denyButtonColor: '#ffc107'
+    });
+
+    let montoCobrado = 0;
+
+    if (resPago.isConfirmed) {
+        montoCobrado = ped.precio;
+    } else if (resPago.isDenied) {
+        // 2. Si no pagó todo, preguntar cuánto
+        const { value: montoIngresado } = await Swal.fire({
+            title: 'Monto Recibido',
+            input: 'number',
+            inputLabel: 'Ingrese la cantidad en colones que el cliente pagó hoy:',
+            inputAttributes: { min: 0, max: ped.precio, step: 1 },
+            showCancelButton: true,
+            inputValidator: (value) => {
+                if (!value || value < 0) return 'Ingrese un monto válido';
+                if (value > ped.precio) return 'El monto no puede ser mayor al precio del pedido';
+            }
+        });
+        if (!montoIngresado) return; // Canceló el prompt
+        montoCobrado = parseFloat(montoIngresado);
+    } else {
+        return; // Canceló todo el proceso
+    }
+
+    // 3. Ejecutar actualizaciones en Firebase
+    try {
+        const fechaHoy = new Date().toISOString().split('T')[0];
+
+        // Actualizar el pedido
+        await updateDoc(doc(db, "pedidos", id), {
+            estado: 'Entregado',
+            monto_pagado: montoCobrado,
+            fecha_cierre: fechaHoy
+        });
+
+        // Registrar en las finanzas automáticamente si hubo dinero de por medio
+        if (montoCobrado > 0) {
+            await addDoc(collection(db, "movimientos"), {
+                tipo: 'entrada',
+                fecha: fechaHoy,
+                descripcion: `Pago de pedido: ${ped.producto}`,
+                entidad: ped.cliente,
+                monto: montoCobrado,
+                timestamp: new Date()
+            });
+        }
+
+        Swal.fire('¡Éxito!', 'Pedido entregado y caja actualizada.', 'success');
+    } catch (e) {
+        Swal.fire('Error', 'Hubo un error al procesar la entrega.', 'error');
+    }
+};
+
+// ==========================================
+// 6. HISTORIAL DE PEDIDOS
+// ==========================================
+function renderizarHistorialPedidos() {
+    const historial = listaPedidos.filter(p => p.estado !== 'Pendiente').sort((a, b) => new Date(b.fecha_cierre) - new Date(a.fecha_cierre));
+    const tbody = document.getElementById('tabla-historial');
+    let html = '';
+
+    historial.forEach(ped => {
+        const badge = ped.estado === 'Entregado' ? 'bg-success' : 'bg-danger';
+        const pago = ped.monto_pagado ? `₡${ped.monto_pagado.toLocaleString('es-CR')}` : '₡0';
+
+        html += `
+            <tr>
+                <td><span class="badge ${badge}">${ped.estado}</span></td>
+                <td>${ped.fecha_cierre}</td>
+                <td class="fw-bold">${ped.cliente}</td>
+                <td>${ped.producto}</td>
+                <td class="fw-bold text-muted">${ped.estado === 'Entregado' ? pago : '-'}</td>
+            </tr>
+        `;
+    });
+    tbody.innerHTML = html || '<tr><td colspan="5" class="text-center py-4 text-muted">Aún no hay historial de entregas.</td></tr>';
+}
+
+// ==========================================
+// 7. MÓDULO FINANCIERO (CAJA Y REPORTES)
+// ==========================================
+document.getElementById('fecha-mov').valueAsDate = new Date();
+
+document.getElementById('form-movimiento').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btnSubmit = e.target.querySelector('button');
+    btnSubmit.disabled = true;
+    try {
+        await addDoc(collection(db, "movimientos"), {
+            tipo: document.getElementById('tipo').value,
+            fecha: document.getElementById('fecha-mov').value,
+            descripcion: document.getElementById('descripcion-mov').value.trim(),
+            entidad: document.getElementById('entidad-mov').value.trim(),
+            monto: parseFloat(document.getElementById('monto-mov').value),
+            timestamp: new Date()
+        });
+        e.target.reset();
+        document.getElementById('fecha-mov').valueAsDate = new Date();
+        Swal.fire({ icon: 'success', title: 'Guardado', timer: 1000, showConfirmButton: false });
+    } catch (err) { Swal.fire('Error', 'No se guardó', 'error'); }
+    finally { btnSubmit.disabled = false; }
+});
+
+function cargarFinanzas() {
+    onSnapshot(query(collection(db, "movimientos"), orderBy("fecha", "desc")), (snapshot) => {
+        listaMovimientos = [];
+        snapshot.forEach((doc) => listaMovimientos.push({ id: doc.id, ...doc.data() }));
+        if (vistas.reportes.classList.contains('active')) generarReporteFinanciero();
+    });
+}
+
+const filtroModo = document.getElementById('filtro-modo');
+const filtroInicio = document.getElementById('filtro-inicio');
+const filtroFin = document.getElementById('filtro-fin');
+[filtroModo, filtroInicio, filtroFin].forEach(el => el.addEventListener('input', generarReporteFinanciero));
+
+function generarReporteFinanciero() {
+    if (!vistas.reportes.classList.contains('active')) return;
+
+    let filtrados = listaMovimientos;
+    if (filtroInicio.value) filtrados = filtrados.filter(m => m.fecha >= filtroInicio.value);
+    if (filtroFin.value) filtrados = filtrados.filter(m => m.fecha <= filtroFin.value);
+    if (filtroModo.value !== 'ambos') filtrados = filtrados.filter(m => m.tipo === (filtroModo.value === 'entradas' ? 'entrada' : 'salida'));
+
+    let tEntradas = 0, tSalidas = 0, html = '';
+
+    filtrados.forEach(m => {
+        if (m.tipo === 'entrada') tEntradas += m.monto; else tSalidas += m.monto;
+        html += `<tr><td>${m.fecha}</td><td><strong>${m.descripcion}</strong><br><small>${m.entidad || ''}</small></td>
+                 <td class="${m.tipo === 'entrada' ? 'text-success' : 'text-danger'} fw-bold">₡${m.monto.toLocaleString('es-CR')}</td></tr>`;
+    });
+
+    document.getElementById('tabla-reportes').innerHTML = html || '<tr><td colspan="3" class="text-center text-muted">No hay movimientos.</td></tr>';
+    document.getElementById('resumen-entradas').textContent = `₡${tEntradas.toLocaleString('es-CR')}`;
+    document.getElementById('resumen-salidas').textContent = `₡${tSalidas.toLocaleString('es-CR')}`;
+    document.getElementById('resumen-balance').textContent = `₡${(tEntradas - tSalidas).toLocaleString('es-CR')}`;
+
+    dibujarGraficoFinanciero(tEntradas, tSalidas, filtroModo.value);
+}
+
+function dibujarGraficoFinanciero(entradas, salidas, modo) {
     if (graficoInstancia) graficoInstancia.destroy();
     if (entradas === 0 && salidas === 0) return;
 
-    let labels = []; let data = []; let colors = [];
-    if (modo === 'ambos') { labels = ['Entradas', 'Salidas']; data = [entradas, salidas]; colors = ['#198754', '#dc3545']; }
-    else if (modo === 'entradas') { labels = ['Entradas']; data = [entradas]; colors = ['#198754']; }
-    else if (modo === 'salidas') { labels = ['Salidas']; data = [salidas]; colors = ['#dc3545']; }
+    let labels = [], data = [], colors = [];
+    if (modo === 'ambos') { labels = ['Ingresos', 'Gastos']; data = [entradas, salidas]; colors = ['#198754', '#dc3545']; }
+    else if (modo === 'entradas') { labels = ['Ingresos']; data = [entradas]; colors = ['#198754']; }
+    else if (modo === 'salidas') { labels = ['Gastos']; data = [salidas]; colors = ['#dc3545']; }
 
-    graficoInstancia = new Chart(ctxGrafico, {
+    graficoInstancia = new Chart(document.getElementById('miGrafico').getContext('2d'), {
         type: 'doughnut',
         data: { labels: labels, datasets: [{ data: data, backgroundColor: colors, hoverOffset: 4 }] },
-        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
     });
 }
-
-// ==========================================
-// 8. EXPORTACIONES (PDF Y EXCEL)
-// ==========================================
-
-btnExportPdf.addEventListener('click', () => {
-    if (datosParaExportar.length === 0) return Swal.fire({ icon: 'warning', title: 'Vacío', text: 'No hay datos para exportar.' });
-
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-
-    doc.setFontSize(16);
-    doc.text("Reporte de Movimientos - MASUCRI", 14, 15);
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text(`Generado el: ${new Date().toLocaleDateString('es-CR')}`, 14, 22);
-
-    const tableColumn = ["Fecha", "Tipo", "Concepto / Detalle", "Cliente / Proveedor", "Monto"];
-    const tableRows = [];
-
-    datosParaExportar.forEach(mov => {
-        tableRows.push([
-            mov.fecha,
-            mov.tipo.toUpperCase(),
-            mov.descripcion,
-            mov.entidad || 'N/A',
-            `₡${mov.monto.toLocaleString('es-CR')}`
-        ]);
-    });
-
-    doc.autoTable({
-        head: [tableColumn],
-        body: tableRows,
-        startY: 28,
-        theme: 'striped',
-        headStyles: { fillColor: [41, 128, 185] }
-    });
-
-    doc.save(`Reporte_MASUCRI_${new Date().getTime()}.pdf`);
-    Swal.fire({ icon: 'success', title: 'Exportado', text: 'El reporte PDF se ha descargado.', timer: 1500, showConfirmButton: false });
-});
-
-btnExportExcel.addEventListener('click', () => {
-    if (datosParaExportar.length === 0) return Swal.fire({ icon: 'warning', title: 'Vacío', text: 'No hay datos para exportar.' });
-
-    const dataSheet = datosParaExportar.map(mov => ({
-        "Fecha": mov.fecha,
-        "Tipo": mov.tipo.toUpperCase(),
-        "Concepto / Detalle": mov.descripcion,
-        "Cliente / Proveedor": mov.entidad || '',
-        "Monto (Colones)": mov.monto
-    }));
-
-    const ws = XLSX.utils.json_to_sheet(dataSheet);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Reporte");
-
-    XLSX.writeFile(wb, `Reporte_MASUCRI_${new Date().getTime()}.xlsx`);
-    Swal.fire({ icon: 'success', title: 'Exportado', text: 'El reporte de Excel se ha descargado.', timer: 1500, showConfirmButton: false });
-});

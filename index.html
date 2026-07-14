@@ -5,6 +5,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MASUCRI - Panel Administrativo</title>
+
+    <!-- FAVICON (El icono de la pestaña) -->
+    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/3143/3143400.png">
+
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Chart.js para los gráficos -->
@@ -33,19 +37,28 @@
         .view-section.active {
             display: block;
         }
+
+        /* Para evitar que los botones de acción se peguen */
+        .btn-accion {
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 2px;
+        }
     </style>
 </head>
 
 <body class="bg-light">
 
-    <!-- ==========================================
-         PANTALLA DE LOGIN (Bloqueo de Seguridad)
-    =========================================== -->
+    <!-- PANTALLA DE LOGIN -->
     <div id="login-container" class="login-screen">
         <div class="card shadow p-4 text-center" style="max-width: 400px; width: 100%;">
             <h2 class="mb-4 text-primary fw-bold">MASUCRI</h2>
             <p class="text-muted">Acceso exclusivo para administradores</p>
-            <button id="btn-login" class="btn btn-dark btn-lg w-100 mt-3">
+            <button id="btn-login" class="btn btn-dark btn-lg w-100 mt-3 shadow-sm">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
                     class="bi bi-google me-2" viewBox="0 0 16 16">
                     <path
@@ -56,13 +69,11 @@
         </div>
     </div>
 
-    <!-- ==========================================
-         APLICACIÓN PRINCIPAL (Solo visible si es Admin)
-    =========================================== -->
+    <!-- APLICACIÓN PRINCIPAL -->
     <div id="app-container" class="d-none flex-column min-vh-100">
 
         <!-- Menú de Navegación -->
-        <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 shadow">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 shadow sticky-top">
             <div class="container">
                 <a class="navbar-brand fw-bold" href="#">MASUCRI</a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -70,31 +81,115 @@
                 </button>
                 <div class="collapse navbar-collapse" id="navbarNav">
                     <ul class="navbar-nav me-auto">
-                        <li class="nav-item">
-                            <a class="nav-link active" href="#" id="nav-registro">Registro Diario</a>
+                        <li class="nav-item"><a class="nav-link active" href="#" id="nav-pedidos">Gestión de Pedidos</a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="#" id="nav-reportes">Reportes y Gráficos</a>
+                        <li class="nav-item"><a class="nav-link" href="#" id="nav-historial">Historial Entregas</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" id="nav-registro">Caja (Ingresos/Gastos)</a>
+                        </li>
+                        <li class="nav-item"><a class="nav-link" href="#" id="nav-reportes">Reportes Financieros</a>
                         </li>
                     </ul>
                     <div class="d-flex align-items-center mt-2 mt-lg-0">
-                        <span id="user-info" class="text-white me-3 fw-semibold"></span>
+                        <span id="user-info" class="text-white me-3 fw-semibold small"></span>
                         <button id="btn-logout" class="btn btn-sm btn-outline-danger">Salir</button>
                     </div>
                 </div>
             </div>
         </nav>
 
-        <!-- Contenido Central -->
         <div class="container flex-grow-1">
 
-            <!-- VISTA 1: REGISTRO -->
-            <div id="vista-registro" class="view-section active">
+            <!-- ==========================================
+                 VISTA 1: GESTIÓN DE PEDIDOS (PRINCIPAL)
+            =========================================== -->
+            <div id="vista-pedidos" class="view-section active">
+                <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+                    <h3 class="fw-bold m-0">Pedidos Pendientes</h3>
+                    <button class="btn btn-primary fw-bold shadow-sm" onclick="abrirModalPedido()">+ Nuevo
+                        Pedido</button>
+                </div>
+
+                <!-- Filtros de Pedidos -->
+                <div class="card shadow-sm mb-4 border-0">
+                    <div class="card-body d-flex flex-wrap gap-3 align-items-end bg-white rounded">
+                        <div class="flex-grow-1">
+                            <label class="form-label small text-muted mb-1">Buscar Cliente/Producto</label>
+                            <input type="text" id="filtro-pedido-texto"
+                                class="form-control form-control-sm border-primary"
+                                placeholder="Ej. Juan, Vinil, Taza...">
+                        </div>
+                        <div>
+                            <label class="form-label small text-muted mb-1">Fecha Solicitud (Desde)</label>
+                            <input type="date" id="filtro-pedido-solicitud" class="form-control form-control-sm">
+                        </div>
+                        <div>
+                            <label class="form-label small text-muted mb-1">Fecha Entrega (Hasta)</label>
+                            <input type="date" id="filtro-pedido-entrega" class="form-control form-control-sm">
+                        </div>
+                        <div>
+                            <button id="btn-limpiar-pedidos" class="btn btn-sm btn-outline-secondary w-100">Limpiar
+                                Filtros</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabla de Pedidos Pendientes -->
+                <div class="card shadow-sm border-0">
+                    <div class="card-body table-responsive p-0">
+                        <table class="table table-hover align-middle m-0">
+                            <thead class="table-dark sticky-top">
+                                <tr>
+                                    <th>Prioridad</th>
+                                    <th>Fechas</th>
+                                    <th>Cliente</th>
+                                    <th>Producto / Detalle</th>
+                                    <th>Precio</th>
+                                    <th class="text-center">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabla-pedidos">
+                                <!-- JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ==========================================
+                 VISTA 2: HISTORIAL DE ENTREGAS
+            =========================================== -->
+            <div id="vista-historial" class="view-section">
+                <h3 class="fw-bold mb-4">Historial de Trabajos Entregados y Cancelados</h3>
+                <div class="card shadow-sm border-0">
+                    <div class="card-body table-responsive p-0" style="max-height: 600px; overflow-y: auto;">
+                        <table class="table table-hover align-middle m-0">
+                            <thead class="table-light sticky-top shadow-sm">
+                                <tr>
+                                    <th>Estado</th>
+                                    <th>Fecha Entrega/Cierre</th>
+                                    <th>Cliente</th>
+                                    <th>Producto</th>
+                                    <th>Monto Final</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabla-historial">
+                                <!-- JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ==========================================
+                 VISTA 3: REGISTRO FINANCIERO MANUAL
+            =========================================== -->
+            <div id="vista-registro" class="view-section">
+                <!-- Se mantiene el formulario original de Movimientos -->
                 <div class="row justify-content-center">
                     <div class="col-md-8">
                         <div class="card shadow-sm mb-5 border-0">
-                            <div class="card-header bg-primary text-white fw-bold">
-                                Registrar Movimiento
+                            <div class="card-header bg-success text-white fw-bold">
+                                Registrar Movimiento Manual en Caja
                             </div>
                             <div class="card-body">
                                 <form id="form-movimiento">
@@ -102,34 +197,34 @@
                                         <div class="col-md-6">
                                             <label class="form-label fw-semibold">Tipo de Movimiento</label>
                                             <select id="tipo" class="form-select" required>
-                                                <option value="entrada">Entrada (Venta/Ingreso)</option>
-                                                <option value="salida">Salida (Gasto/Compra)</option>
+                                                <option value="entrada">Entrada (Ingreso Extra)</option>
+                                                <option value="salida">Salida (Gasto/Compra Material)</option>
                                             </select>
                                         </div>
                                         <div class="col-md-6 mt-3 mt-md-0">
                                             <label class="form-label fw-semibold">Fecha</label>
-                                            <input type="date" id="fecha" class="form-control" required>
+                                            <input type="date" id="fecha-mov" class="form-control" required>
                                         </div>
                                     </div>
                                     <div class="mb-3">
                                         <label class="form-label fw-semibold">Concepto / Descripción</label>
-                                        <input type="text" id="descripcion" class="form-control"
-                                            placeholder="Ej. Confección de uniforme, sublimación de taza..." required>
+                                        <input type="text" id="descripcion-mov" class="form-control"
+                                            placeholder="Ej. Compra de hojas para sublimar..." required>
                                     </div>
                                     <div class="row mb-3">
                                         <div class="col-md-6">
-                                            <label class="form-label fw-semibold">Cliente / Proveedor</label>
-                                            <input type="text" id="entidad" class="form-control"
+                                            <label class="form-label fw-semibold">Entidad / Local</label>
+                                            <input type="text" id="entidad-mov" class="form-control"
                                                 placeholder="(Opcional)">
                                         </div>
                                         <div class="col-md-6 mt-3 mt-md-0">
                                             <label class="form-label fw-semibold">Monto Total (₡)</label>
-                                            <input type="number" id="monto" class="form-control" required min="1"
+                                            <input type="number" id="monto-mov" class="form-control" required min="1"
                                                 step="0.01">
                                         </div>
                                     </div>
-                                    <button type="submit" class="btn btn-primary w-100 py-2 fw-bold shadow-sm">Guardar
-                                        Movimiento</button>
+                                    <button type="submit" class="btn btn-success w-100 py-2 fw-bold shadow-sm">Guardar
+                                        en Caja</button>
                                 </form>
                             </div>
                         </div>
@@ -137,53 +232,10 @@
                 </div>
             </div>
 
-            <!-- VISTA 2: REPORTES Y GRÁFICOS -->
+            <!-- ==========================================
+                 VISTA 4: REPORTES FINANCIEROS (Se mantiene)
+            =========================================== -->
             <div id="vista-reportes" class="view-section">
-
-                <!-- Búsqueda, Filtros y Exportación en Tiempo Real -->
-                <div class="card shadow-sm mb-4 border-0">
-                    <div class="card-body bg-white rounded">
-                        <div class="row g-3 align-items-end">
-                            <div class="col-md-4">
-                                <label class="form-label small text-muted mb-1 fw-bold">Buscar en tiempo real</label>
-                                <input type="text" id="busqueda-texto"
-                                    class="form-control form-control-sm border-primary"
-                                    placeholder="Buscar por concepto o cliente...">
-                            </div>
-                            <div class="col-md-2">
-                                <label class="form-label small text-muted mb-1">Mostrar</label>
-                                <select id="filtro-modo" class="form-select form-select-sm">
-                                    <option value="ambos">Todo</option>
-                                    <option value="entradas">Entradas</option>
-                                    <option value="salidas">Salidas</option>
-                                </select>
-                            </div>
-                            <div class="col-md-2">
-                                <label class="form-label small text-muted mb-1">Desde</label>
-                                <input type="date" id="filtro-inicio" class="form-control form-control-sm">
-                            </div>
-                            <div class="col-md-2">
-                                <label class="form-label small text-muted mb-1">Hasta</label>
-                                <input type="date" id="filtro-fin" class="form-control form-control-sm">
-                            </div>
-                            <div class="col-md-2">
-                                <button id="btn-limpiar" class="btn btn-sm btn-outline-secondary w-100">Ver
-                                    Todo</button>
-                            </div>
-                        </div>
-                        <hr class="my-3">
-                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                            <span class="small text-muted fw-semibold">Descargar datos de la vista actual:</span>
-                            <div>
-                                <button id="btn-export-pdf" class="btn btn-sm btn-danger px-3 shadow-sm">📄 Exportar
-                                    PDF</button>
-                                <button id="btn-export-excel" class="btn btn-sm btn-success px-3 shadow-sm">📊 Exportar
-                                    Excel</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Tarjetas de Resumen -->
                 <div class="row mb-4 justify-content-center" id="contenedor-resumen">
                     <div class="col-md-4 mb-3" id="card-entradas">
@@ -205,39 +257,52 @@
                     <div class="col-md-4 mb-3" id="card-balance">
                         <div class="card text-bg-info text-white shadow-sm text-center h-100">
                             <div class="card-body">
-                                <h6>Balance</h6>
+                                <h6>Balance Neto</h6>
                                 <h3 id="resumen-balance">₡0</h3>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Gráfico y Tabla -->
                 <div class="row">
-                    <div class="col-lg-4 mb-4">
+                    <div class="col-lg-5 mb-4">
                         <div class="card shadow-sm h-100 border-0">
-                            <div class="card-header bg-white fw-bold">Gráfico</div>
-                            <div class="card-body d-flex justify-content-center align-items-center">
-                                <canvas id="miGrafico"></canvas>
+                            <div class="card-header bg-white fw-bold">Filtros y Gráficos</div>
+                            <div class="card-body">
+                                <div class="mb-2"><select id="filtro-modo" class="form-select form-select-sm">
+                                        <option value="ambos">Ver Todo</option>
+                                        <option value="entradas">Solo Entradas</option>
+                                        <option value="salidas">Solo Salidas</option>
+                                    </select></div>
+                                <div class="mb-2"><input type="date" id="filtro-inicio"
+                                        class="form-control form-control-sm" title="Desde"></div>
+                                <div class="mb-3"><input type="date" id="filtro-fin"
+                                        class="form-control form-control-sm" title="Hasta"></div>
+                                <div class="d-flex justify-content-center align-items-center mt-4">
+                                    <canvas id="miGrafico" style="max-height: 250px;"></canvas>
+                                </div>
                             </div>
                         </div>
                     </div>
-                    <div class="col-lg-8 mb-4">
+                    <div class="col-lg-7 mb-4">
                         <div class="card shadow-sm h-100 border-0">
-                            <div class="card-header bg-white fw-bold">Detalle de Movimientos</div>
-                            <div class="card-body table-responsive p-0" style="max-height: 500px; overflow-y: auto;">
+                            <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
+                                <span>Libro Diario</span>
+                                <div>
+                                    <button id="btn-export-pdf" class="btn btn-sm btn-danger px-2">PDF</button>
+                                    <button id="btn-export-excel" class="btn btn-sm btn-success px-2">Excel</button>
+                                </div>
+                            </div>
+                            <div class="card-body table-responsive p-0" style="max-height: 450px; overflow-y: auto;">
                                 <table class="table table-hover align-middle m-0">
                                     <thead class="table-light sticky-top shadow-sm">
                                         <tr>
                                             <th>Fecha</th>
-                                            <th>Concepto</th>
+                                            <th>Detalle</th>
                                             <th>Monto</th>
-                                            <th class="text-center">Acciones</th>
                                         </tr>
                                     </thead>
-                                    <tbody id="tabla-reportes">
-                                        <!-- Datos inyectados por JS -->
-                                    </tbody>
+                                    <tbody id="tabla-reportes"></tbody>
                                 </table>
                             </div>
                         </div>
@@ -246,63 +311,63 @@
             </div>
         </div>
 
-        <!-- FOOTER -->
         <footer class="bg-dark text-white text-center py-3 mt-4 shadow-lg">
             <div class="container">
-                <p class="mb-0 fw-bold fs-5">MASUCRI</p>
-                <small class="text-white-50">Sistema Administrativo - Confecciones y Sublimaciones</small>
+                <p class="mb-0 fw-bold">MASUCRI</p><small class="text-white-50">Sistema de Gestión Central</small>
             </div>
         </footer>
-
     </div>
 
-    <!-- MODAL DE EDICIÓN -->
-    <div class="modal fade" id="modalEditar" tabindex="-1" aria-hidden="true">
+    <!-- ==========================================
+         MODAL: NUEVO / EDITAR PEDIDO
+    =========================================== -->
+    <div class="modal fade" id="modalPedido" tabindex="-1" data-bs-backdrop="static">
         <div class="modal-dialog">
             <div class="modal-content border-0 shadow">
-                <div class="modal-header bg-warning">
-                    <h5 class="modal-title fw-bold">Editar Movimiento</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold" id="tituloModalPedido">Nuevo Pedido</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <form id="form-editar">
-                        <input type="hidden" id="edit-id">
+                    <form id="form-pedido">
+                        <input type="hidden" id="ped-id">
                         <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label class="form-label">Tipo</label>
-                                <select id="edit-tipo" class="form-select" required>
-                                    <option value="entrada">Entrada</option>
-                                    <option value="salida">Salida</option>
-                                </select>
+                            <div class="col-6">
+                                <label class="form-label fw-semibold text-muted small">Fecha Solicitud</label>
+                                <input type="date" id="ped-solicitado" class="form-control" required readonly>
                             </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Fecha</label>
-                                <input type="date" id="edit-fecha" class="form-control" required>
+                            <div class="col-6">
+                                <label class="form-label fw-bold text-primary small">Fecha de Entrega</label>
+                                <input type="date" id="ped-entrega" class="form-control border-primary" required>
                             </div>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Concepto</label>
-                            <input type="text" id="edit-descripcion" class="form-control" required>
+                            <label class="form-label">Nombre del Cliente</label>
+                            <input type="text" id="ped-cliente" class="form-control" placeholder="Ej. María Rojas"
+                                required>
                         </div>
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label class="form-label">Entidad</label>
-                                <input type="text" id="edit-entidad" class="form-control">
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Monto (₡)</label>
-                                <input type="number" id="edit-monto" class="form-control" required min="1" step="0.01">
-                            </div>
+                        <div class="mb-3">
+                            <label class="form-label">Producto / Servicio</label>
+                            <input type="text" id="ped-producto" class="form-control"
+                                placeholder="Ej. Camiseta Dama M, o Stickers de Vinil" required>
                         </div>
-                        <button type="submit" class="btn btn-warning w-100 fw-bold shadow-sm">Actualizar
-                            Cambios</button>
+                        <div class="mb-3">
+                            <label class="form-label">Descripción o Notas Adicionales</label>
+                            <textarea id="ped-desc" class="form-control" rows="2"
+                                placeholder="Ej. Diseño personalizado, corte a mano..."></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Precio Total Acordado (₡)</label>
+                            <input type="number" id="ped-precio" class="form-control bg-light" required min="1"
+                                step="0.01">
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100 fw-bold shadow-sm">Guardar Pedido</button>
                     </form>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script type="module" src="app.js"></script>
 </body>
