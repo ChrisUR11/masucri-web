@@ -6,10 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MASUCRI - Panel Administrativo</title>
 
-    <!-- FAVICON -->
     <link rel="icon" type="image/png" href="logo-masucri.png">
 
-    <!-- Bootstrap 5 CSS -->
+    <!-- Bootstrap 5 & Librerías -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11.10.6/dist/sweetalert2.min.css" rel="stylesheet">
@@ -17,6 +16,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- NUEVA LIBRERÍA PARA CREAR EL TICKET EN IMAGEN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <style>
         .login-screen {
@@ -45,13 +46,25 @@
             margin: 0 2px;
         }
 
-        /* Evitar que las tablas se pongan sobre el menú */
         .navbar {
             z-index: 1030 !important;
         }
 
         thead.sticky-top {
             z-index: 10 !important;
+        }
+
+        /* Estilos del Ticket Oculto */
+        #ticket-template {
+            position: absolute;
+            top: -9999px;
+            left: -9999px;
+            width: 350px;
+            background: #fff;
+            padding: 20px;
+            border: 2px dashed #333;
+            font-family: monospace;
+            color: #000;
         }
     </style>
 </head>
@@ -64,12 +77,7 @@
             <img src="logo-masucri.png" alt="MASUCRI Logo" class="mx-auto mb-3" style="max-height: 80px; width: auto;">
             <p class="text-muted">Acceso exclusivo para administradores</p>
             <button id="btn-login" class="btn btn-dark btn-lg w-100 mt-3 shadow-sm">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
-                    class="bi bi-google me-2" viewBox="0 0 16 16">
-                    <path
-                        d="M15.545 6.558a9.42 9.42 0 0 1 .139 1.626c0 2.434-.87 4.492-2.384 5.885h.002C11.978 15.292 10.158 16 8 16A8 8 0 1 1 8 0a7.689 7.689 0 0 1 5.352 2.082l-2.284 2.284A4.347 4.347 0 0 0 8 3.166c-2.087 0-3.86 1.408-4.492 3.304a4.792 4.792 0 0 0 0 3.063h.003c.635 1.893 2.405 3.301 4.492 3.301 1.078 0 2.004-.276 2.722-.764h-.003a3.702 3.702 0 0 0 1.599-2.431H8v-3.08h7.545z" />
-                </svg>
-                Iniciar sesión
+                Iniciar sesión con Google
             </button>
         </div>
     </div>
@@ -88,13 +96,13 @@
                 </button>
                 <div class="collapse navbar-collapse" id="navbarNav">
                     <ul class="navbar-nav me-auto">
-                        <li class="nav-item"><a class="nav-link active" href="#" id="nav-pedidos">Gestión de Pedidos</a>
-                        </li>
-                        <li class="nav-item"><a class="nav-link" href="#" id="nav-historial">Historial Entregas</a></li>
-                        <li class="nav-item"><a class="nav-link" href="#" id="nav-registro">Caja (Ingresos/Gastos)</a>
-                        </li>
-                        <li class="nav-item"><a class="nav-link" href="#" id="nav-reportes">Reportes Financieros</a>
-                        </li>
+                        <li class="nav-item"><a class="nav-link active" href="#" id="nav-pedidos">Pedidos</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" id="nav-historial">Historial</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" id="nav-registro">Caja</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" id="nav-reportes">Finanzas</a></li>
+                        <!-- NUEVO BOTÓN DASHBOARD -->
+                        <li class="nav-item"><a class="nav-link fw-bold text-warning" href="#" id="nav-dashboard">📊
+                                Inteligencia MASUCRI</a></li>
                     </ul>
                     <div class="d-flex align-items-center mt-2 mt-lg-0">
                         <span id="user-info" class="text-white me-3 fw-semibold small"></span>
@@ -116,24 +124,15 @@
 
                 <div class="card shadow-sm mb-4 border-0">
                     <div class="card-body d-flex flex-wrap gap-3 align-items-end bg-white rounded">
-                        <div class="flex-grow-1">
-                            <label class="form-label small text-muted mb-1">Buscar Cliente/Producto</label>
-                            <input type="text" id="filtro-pedido-texto"
-                                class="form-control form-control-sm border-primary"
-                                placeholder="Ej. Juan, Vinil, Taza...">
-                        </div>
-                        <div>
-                            <label class="form-label small text-muted mb-1">Solicitado (Desde)</label>
-                            <input type="date" id="filtro-pedido-solicitud" class="form-control form-control-sm">
-                        </div>
-                        <div>
-                            <label class="form-label small text-muted mb-1">Entrega (Hasta)</label>
-                            <input type="date" id="filtro-pedido-entrega" class="form-control form-control-sm">
-                        </div>
-                        <div>
-                            <button id="btn-limpiar-pedidos" class="btn btn-sm btn-outline-secondary w-100">Limpiar
-                                Filtros</button>
-                        </div>
+                        <div class="flex-grow-1"><label class="form-label small text-muted mb-1">Buscar</label><input
+                                type="text" id="filtro-pedido-texto"
+                                class="form-control form-control-sm border-primary"></div>
+                        <div><label class="form-label small text-muted mb-1">Desde</label><input type="date"
+                                id="filtro-pedido-solicitud" class="form-control form-control-sm"></div>
+                        <div><label class="form-label small text-muted mb-1">Hasta</label><input type="date"
+                                id="filtro-pedido-entrega" class="form-control form-control-sm"></div>
+                        <div><button id="btn-limpiar-pedidos"
+                                class="btn btn-sm btn-outline-secondary w-100">Limpiar</button></div>
                     </div>
                 </div>
 
@@ -163,12 +162,11 @@
                     <select id="filtro-historial"
                         class="form-select w-auto border-primary fw-bold text-primary shadow-sm">
                         <option value="con_saldo" selected>🔍 Mostrar: Con Saldo Pendiente</option>
-                        <option value="todos">Mostrar: Todos (Histórico completo)</option>
+                        <option value="todos">Mostrar: Todos</option>
                         <option value="entregados">Mostrar: Pagados al 100%</option>
                         <option value="cancelados">Mostrar: Cancelados</option>
                     </select>
                 </div>
-
                 <div class="card shadow-sm border-0">
                     <div class="card-body table-responsive p-0" style="max-height: 600px; overflow-y: auto;">
                         <table class="table table-hover align-middle m-0 text-nowrap">
@@ -193,43 +191,43 @@
                 <div class="row justify-content-center">
                     <div class="col-md-8">
                         <div class="card shadow-sm mb-5 border-0">
-                            <div class="card-header bg-success text-white fw-bold">
-                                Registrar Movimiento Manual en Caja
+                            <div class="card-header bg-success text-white fw-bold">Registrar Movimiento Manual en Caja
                             </div>
                             <div class="card-body">
                                 <form id="form-movimiento">
                                     <div class="row mb-3">
-                                        <div class="col-md-6">
-                                            <label class="form-label fw-semibold">Tipo de Movimiento</label>
+                                        <div class="col-md-4">
+                                            <label class="form-label fw-semibold">Tipo</label>
                                             <select id="tipo" class="form-select" required>
-                                                <option value="entrada">Entrada (Ingreso Extra)</option>
-                                                <option value="salida">Salida (Gasto/Compra Material)</option>
+                                                <option value="entrada">Entrada</option>
+                                                <option value="salida">Salida</option>
                                             </select>
                                         </div>
-                                        <div class="col-md-6 mt-3 mt-md-0">
+                                        <div class="col-md-4 mt-3 mt-md-0">
                                             <label class="form-label fw-semibold">Fecha</label>
                                             <input type="date" id="fecha-mov" class="form-control" required>
                                         </div>
+                                        <div class="col-md-4 mt-3 mt-md-0">
+                                            <label class="form-label fw-semibold text-primary">Método de Pago</label>
+                                            <select id="metodo-pago-mov" class="form-select border-primary" required>
+                                                <option value="Efectivo">Efectivo 💵</option>
+                                                <option value="Sinpe Móvil">Sinpe Móvil 📱</option>
+                                                <option value="Transferencia">Transferencia 🏦</option>
+                                            </select>
+                                        </div>
                                     </div>
-                                    <div class="mb-3">
-                                        <label class="form-label fw-semibold">Concepto / Descripción</label>
-                                        <input type="text" id="descripcion-mov" class="form-control"
-                                            placeholder="Ej. Compra de hojas para sublimar..." required>
-                                    </div>
+                                    <div class="mb-3"><label class="form-label fw-semibold">Concepto</label><input
+                                            type="text" id="descripcion-mov" class="form-control" required></div>
                                     <div class="row mb-3">
-                                        <div class="col-md-6">
-                                            <label class="form-label fw-semibold">Entidad / Local</label>
-                                            <input type="text" id="entidad-mov" class="form-control"
-                                                placeholder="(Opcional)">
+                                        <div class="col-md-6"><label class="form-label fw-semibold">Entidad /
+                                                Local</label><input type="text" id="entidad-mov" class="form-control">
                                         </div>
-                                        <div class="col-md-6 mt-3 mt-md-0">
-                                            <label class="form-label fw-semibold">Monto Total (₡)</label>
-                                            <input type="number" id="monto-mov" class="form-control" required min="1"
-                                                step="0.01">
-                                        </div>
+                                        <div class="col-md-6 mt-3 mt-md-0"><label class="form-label fw-semibold">Monto
+                                                (₡)</label><input type="number" id="monto-mov" class="form-control"
+                                                required min="1" step="0.01"></div>
                                     </div>
-                                    <button type="submit" class="btn btn-success w-100 py-2 fw-bold shadow-sm">Guardar
-                                        en Caja</button>
+                                    <button type="submit" class="btn btn-success w-100 py-2 fw-bold">Guardar en
+                                        Caja</button>
                                 </form>
                             </div>
                         </div>
@@ -243,7 +241,7 @@
                     <div class="col-md-4 mb-3">
                         <div class="card text-bg-success shadow-sm text-center h-100">
                             <div class="card-body">
-                                <h6>Total Entradas</h6>
+                                <h6>Entradas</h6>
                                 <h3 id="resumen-entradas">₡0</h3>
                             </div>
                         </div>
@@ -251,7 +249,7 @@
                     <div class="col-md-4 mb-3">
                         <div class="card text-bg-danger shadow-sm text-center h-100">
                             <div class="card-body">
-                                <h6>Total Salidas</h6>
+                                <h6>Salidas</h6>
                                 <h3 id="resumen-salidas">₡0</h3>
                             </div>
                         </div>
@@ -265,11 +263,10 @@
                         </div>
                     </div>
                 </div>
-
                 <div class="row">
                     <div class="col-lg-4 mb-4">
                         <div class="card shadow-sm h-100 border-0">
-                            <div class="card-header bg-white fw-bold">Filtros y Gráficos</div>
+                            <div class="card-header bg-white fw-bold">Filtros</div>
                             <div class="card-body">
                                 <div class="mb-2"><select id="filtro-modo" class="form-select form-select-sm">
                                         <option value="ambos">Ver Todo</option>
@@ -277,12 +274,11 @@
                                         <option value="salidas">Solo Salidas</option>
                                     </select></div>
                                 <div class="mb-2"><input type="date" id="filtro-inicio"
-                                        class="form-control form-control-sm" title="Desde"></div>
+                                        class="form-control form-control-sm"></div>
                                 <div class="mb-3"><input type="date" id="filtro-fin"
-                                        class="form-control form-control-sm" title="Hasta"></div>
-                                <div class="d-flex justify-content-center align-items-center mt-4">
-                                    <canvas id="miGrafico" style="max-height: 250px;"></canvas>
-                                </div>
+                                        class="form-control form-control-sm"></div>
+                                <div class="d-flex justify-content-center align-items-center mt-4"><canvas
+                                        id="miGrafico" style="max-height: 250px;"></canvas></div>
                             </div>
                         </div>
                     </div>
@@ -290,17 +286,15 @@
                         <div class="card shadow-sm h-100 border-0">
                             <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
                                 <span>Libro Diario</span>
-                                <div>
-                                    <button id="btn-export-pdf" class="btn btn-sm btn-danger px-2">PDF</button>
-                                    <button id="btn-export-excel" class="btn btn-sm btn-success px-2">Excel</button>
-                                </div>
+                                <div><button id="btn-export-pdf" class="btn btn-sm btn-danger px-2">PDF</button> <button
+                                        id="btn-export-excel" class="btn btn-sm btn-success px-2">Excel</button></div>
                             </div>
                             <div class="card-body table-responsive p-0" style="max-height: 450px; overflow-y: auto;">
                                 <table class="table table-hover align-middle m-0 text-nowrap">
                                     <thead class="table-light sticky-top shadow-sm">
                                         <tr>
                                             <th>Fecha</th>
-                                            <th>Detalle</th>
+                                            <th>Detalle / Método</th>
                                             <th>Monto</th>
                                             <th class="text-center">Acciones</th>
                                         </tr>
@@ -312,57 +306,129 @@
                     </div>
                 </div>
             </div>
-        </div>
 
-        <footer class="bg-dark text-white text-center py-3 mt-4 shadow-lg">
-            <div class="container">
-                <p class="mb-0 fw-bold">MASUCRI</p><small class="text-white-50">Sistema de Gestión Central</small>
+            <!-- VISTA 5: DASHBOARD BI (NUEVO) -->
+            <div id="vista-dashboard" class="view-section">
+                <h3 class="fw-bold mb-4">Inteligencia de Negocios (BI)</h3>
+
+                <div class="row">
+                    <!-- CRM: Perfiles de Clientes -->
+                    <div class="col-lg-6 mb-4">
+                        <div class="card shadow-sm border-0 h-100">
+                            <div class="card-header bg-dark text-white fw-bold">🏆 Top 5 Mejores Clientes (Histórico)
+                            </div>
+                            <div class="card-body p-0">
+                                <ul class="list-group list-group-flush" id="lista-crm-clientes">
+                                    <!-- Se llena con JS -->
+                                </ul>
+                            </div>
+                            <div class="card-footer bg-white text-muted small text-center" id="texto-nuevos-clientes">
+                                Cargando métricas de fidelización...
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ESTADÍSTICA: Desviación Estándar -->
+                    <div class="col-lg-6 mb-4">
+                        <div class="card shadow-sm border-0 h-100">
+                            <div class="card-header bg-primary text-white fw-bold">📈 Análisis de Volatilidad (Ingresos)
+                            </div>
+                            <div class="card-body d-flex flex-column justify-content-center">
+                                <p class="text-muted small mb-2">Evalúa qué tan inestable es tu flujo de caja mensual
+                                    utilizando la desviación estándar poblacional.</p>
+                                <div id="alerta-volatilidad" class="alert alert-info text-center py-2 mb-3 fw-bold">
+                                    Calculando...</div>
+                                <div class="row text-center">
+                                    <div class="col-6">
+                                        <h6 class="text-muted">Promedio Mensual (μ)</h6>
+                                        <h4 class="fw-bold text-success" id="stat-media">₡0</h4>
+                                    </div>
+                                    <div class="col-6">
+                                        <h6 class="text-muted">Desviación Est. (σ)</h6>
+                                        <h4 class="fw-bold text-primary" id="stat-desv">₡0</h4>
+                                    </div>
+                                </div>
+                                <hr>
+                                <p class="small text-muted mb-0"><strong>Recomendación del sistema:</strong> <span
+                                        id="stat-recomendacion">Analizando datos...</span></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <!-- ESTACIONALIDAD Y DEMANDA -->
+                    <div class="col-12 mb-4">
+                        <div class="card shadow-sm border-0">
+                            <div class="card-header bg-white fw-bold">🛍️ Estacionalidad: Top 5 Categorías más vendidas
+                            </div>
+                            <div class="card-body">
+                                <canvas id="graficoEstacionalidad" style="max-height: 300px;"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-        </footer>
+
+        </div>
     </div>
 
-    <!-- MODAL: NUEVO / EDITAR PEDIDO -->
+    <!-- PLANTILLA OCULTA PARA EL RECIBO/TICKET DE IMAGEN -->
+    <div id="ticket-template">
+        <div style="text-align: center; border-bottom: 2px dashed #000; padding-bottom: 10px; margin-bottom: 15px;">
+            <img src="logo-masucri.png" alt="MASUCRI" style="max-width: 80px; margin-bottom: 10px;">
+            <h2 style="margin: 0; font-size: 22px;">MASUCRI</h2>
+            <p style="margin: 0; font-size: 12px; color: #555;">Sublimación & Vinil</p>
+        </div>
+        <p style="margin: 5px 0;"><strong>Fecha:</strong> <span id="tkt-fecha"></span></p>
+        <p style="margin: 5px 0;"><strong>Cliente:</strong> <span id="tkt-cliente"></span></p>
+        <p style="margin: 5px 0;"><strong>Producto:</strong> <span id="tkt-producto"></span></p>
+        <div style="background: #f0f0f0; padding: 10px; margin: 15px 0; border-radius: 5px;">
+            <h4 style="margin: 0 0 10px 0; text-align: center;">Resumen de Pago</h4>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;"><span>Saldo Anterior:</span>
+                <strong id="tkt-anterior"></strong></div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: green;"><span>Abono /
+                    Pago:</span> <strong id="tkt-abono"></strong></div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;"><span>Método:</span> <strong
+                    id="tkt-metodo"></strong></div>
+            <hr style="border: 1px solid #ccc; margin: 8px 0;">
+            <div style="display: flex; justify-content: space-between; font-size: 18px;"><span>Saldo Restante:</span>
+                <strong id="tkt-saldo"></strong></div>
+        </div>
+        <div style="text-align: center; margin-top: 20px;">
+            <span id="tkt-estado"
+                style="background: #000; color: #fff; padding: 5px 15px; border-radius: 20px; font-weight: bold;"></span>
+            <p style="margin-top: 15px; font-size: 12px; color: #666;">¡Gracias por confiar en nosotros!</p>
+        </div>
+    </div>
+
+    <!-- MODAL: NUEVO / EDITAR PEDIDO (Igual) -->
     <div class="modal fade" id="modalPedido" tabindex="-1" data-bs-backdrop="static">
         <div class="modal-dialog">
             <div class="modal-content border-0 shadow">
                 <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title fw-bold" id="tituloModalPedido">Nuevo Pedido</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <h5 class="modal-title fw-bold" id="tituloModalPedido">Nuevo Pedido</h5><button type="button"
+                        class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <form id="form-pedido">
-                        <input type="hidden" id="ped-id">
+                    <form id="form-pedido"><input type="hidden" id="ped-id">
                         <div class="row mb-3">
-                            <div class="col-6">
-                                <label class="form-label fw-semibold text-muted small">Fecha Solicitud</label>
-                                <input type="date" id="ped-solicitado" class="form-control" required readonly>
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label fw-bold text-primary small">Fecha de Entrega</label>
-                                <input type="date" id="ped-entrega" class="form-control border-primary">
-                            </div>
+                            <div class="col-6"><label class="form-label fw-semibold text-muted small">Fecha
+                                    Solicitud</label><input type="date" id="ped-solicitado" class="form-control"
+                                    required readonly></div>
+                            <div class="col-6"><label class="form-label fw-bold text-primary small">Fecha de
+                                    Entrega</label><input type="date" id="ped-entrega"
+                                    class="form-control border-primary"></div>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label">Nombre del Cliente</label>
-                            <input type="text" id="ped-cliente" class="form-control" placeholder="Ej. María Rojas"
-                                required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Producto / Servicio</label>
-                            <input type="text" id="ped-producto" class="form-control" placeholder="Ej. Camiseta Dama M"
-                                required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Descripción o Notas Adicionales</label>
-                            <textarea id="ped-desc" class="form-control" rows="2"
-                                placeholder="Ej. Diseño personalizado..."></textarea>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Precio Total (Opcional)</label>
-                            <input type="number" id="ped-precio" class="form-control bg-light" min="0" step="0.01"
-                                placeholder="Dejar en blanco si está pendiente">
-                        </div>
-                        <button type="submit" class="btn btn-primary w-100 fw-bold shadow-sm">Guardar Pedido</button>
+                        <div class="mb-3"><label class="form-label">Nombre del Cliente</label><input type="text"
+                                id="ped-cliente" class="form-control" required></div>
+                        <div class="mb-3"><label class="form-label">Producto / Servicio</label><input type="text"
+                                id="ped-producto" class="form-control" required></div>
+                        <div class="mb-3"><label class="form-label">Descripción o Notas</label><textarea id="ped-desc"
+                                class="form-control" rows="2"></textarea></div>
+                        <div class="mb-3"><label class="form-label fw-bold">Precio Total (Opcional)</label><input
+                                type="number" id="ped-precio" class="form-control bg-light" min="0" step="0.01"></div>
+                        <button type="submit" class="btn btn-primary w-100 fw-bold">Guardar Pedido</button>
                     </form>
                 </div>
             </div>
@@ -374,41 +440,32 @@
         <div class="modal-dialog">
             <div class="modal-content border-0 shadow">
                 <div class="modal-header bg-warning">
-                    <h5 class="modal-title fw-bold">Editar Movimiento</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <h5 class="modal-title fw-bold">Editar Movimiento</h5><button type="button" class="btn-close"
+                        data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <form id="form-editar-mov">
-                        <input type="hidden" id="edit-id-mov">
+                    <form id="form-editar-mov"><input type="hidden" id="edit-id-mov">
                         <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label class="form-label">Tipo</label>
-                                <select id="edit-tipo-mov" class="form-select" required>
+                            <div class="col-md-6"><label class="form-label">Tipo</label><select id="edit-tipo-mov"
+                                    class="form-select" required>
                                     <option value="entrada">Entrada</option>
                                     <option value="salida">Salida</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Fecha</label>
-                                <input type="date" id="edit-fecha-mov" class="form-control" required>
-                            </div>
+                                </select></div>
+                            <div class="col-md-6"><label class="form-label">Fecha</label><input type="date"
+                                    id="edit-fecha-mov" class="form-control" required></div>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label">Concepto</label>
-                            <input type="text" id="edit-desc-mov" class="form-control" required>
-                        </div>
+                        <div class="mb-3"><label class="form-label">Concepto</label><input type="text"
+                                id="edit-desc-mov" class="form-control" required></div>
                         <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label class="form-label">Entidad</label>
-                                <input type="text" id="edit-ent-mov" class="form-control">
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Monto (₡)</label>
-                                <input type="number" id="edit-monto-mov" class="form-control" required min="1"
-                                    step="0.01">
-                            </div>
-                        </div>
-                        <button type="submit" class="btn btn-warning w-100 fw-bold shadow-sm">Actualizar</button>
+                            <div class="col-md-6"><label class="form-label">Método Pago</label><select
+                                    id="edit-metodo-mov" class="form-select">
+                                    <option value="Efectivo">Efectivo</option>
+                                    <option value="Sinpe Móvil">Sinpe Móvil</option>
+                                    <option value="Transferencia">Transferencia</option>
+                                </select></div>
+                            <div class="col-md-6"><label class="form-label">Monto (₡)</label><input type="number"
+                                    id="edit-monto-mov" class="form-control" required min="1" step="0.01"></div>
+                        </div><button type="submit" class="btn btn-warning w-100 fw-bold shadow-sm">Actualizar</button>
                     </form>
                 </div>
             </div>
