@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MASUCRI - Panel Administrativo</title>
 
-    <!-- FAVICON (El icono de la pestaña) -->
+    <!-- FAVICON -->
     <link rel="icon" type="image/png" href="logo-masucri.png">
 
     <!-- Bootstrap 5 CSS -->
@@ -44,6 +44,15 @@
             justify-content: center;
             margin: 0 2px;
         }
+
+        /* CORRECCIÓN 1: Evitar que las tablas se pongan sobre el menú */
+        .navbar {
+            z-index: 1030 !important;
+        }
+
+        thead.sticky-top {
+            z-index: 10 !important;
+        }
     </style>
 </head>
 
@@ -52,7 +61,7 @@
     <!-- PANTALLA DE LOGIN -->
     <div id="login-container" class="login-screen">
         <div class="card shadow p-4 text-center" style="max-width: 400px; width: 100%;">
-            <h2 class="mb-4 text-primary fw-bold">MASUCRI</h2>
+            <img src="logo-masucri.png" alt="MASUCRI Logo" class="mx-auto mb-3" style="max-height: 80px; width: auto;">
             <p class="text-muted">Acceso exclusivo para administradores</p>
             <button id="btn-login" class="btn btn-dark btn-lg w-100 mt-3 shadow-sm">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
@@ -70,10 +79,11 @@
 
         <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 shadow sticky-top">
             <div class="container">
-                <a class="navbar-brand d-flex align-items-center py-0" href="#">
-                    <img src="logo-masucri.png" alt="MASUCRI Logo"
-                        style="height: 55px; width: auto; object-fit: contain;">
-                </a> <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <a class="navbar-brand d-flex align-items-center" href="#">
+                    <img src="logo-masucri.png" alt="MASUCRI" height="35" class="d-inline-block align-text-top me-2"
+                        style="object-fit: contain;">
+                </a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                     <span class="navbar-toggler-icon"></span>
                 </button>
                 <div class="collapse navbar-collapse" id="navbarNav">
@@ -114,11 +124,16 @@
                         </div>
                         <div>
                             <label class="form-label small text-muted mb-1">Solicitado (Desde)</label>
-                            <input type="date" id="filtro-pedido-solicitud" class="form-control form-control-sm">
+                            <!-- CORRECCIÓN 3: onfocus cambia a 'date' para evitar cuadro en blanco en cel -->
+                            <input type="text" id="filtro-pedido-solicitud" class="form-control form-control-sm"
+                                placeholder="dd/mm/aaaa" onfocus="(this.type='date')"
+                                onblur="(this.value === '' ? this.type='text' : this.type='date')">
                         </div>
                         <div>
                             <label class="form-label small text-muted mb-1">Entrega (Hasta)</label>
-                            <input type="date" id="filtro-pedido-entrega" class="form-control form-control-sm">
+                            <input type="text" id="filtro-pedido-entrega" class="form-control form-control-sm"
+                                placeholder="dd/mm/aaaa" onfocus="(this.type='date')"
+                                onblur="(this.value === '' ? this.type='text' : this.type='date')">
                         </div>
                         <div>
                             <button id="btn-limpiar-pedidos" class="btn btn-sm btn-outline-secondary w-100">Limpiar
@@ -129,7 +144,7 @@
 
                 <div class="card shadow-sm border-0">
                     <div class="card-body table-responsive p-0">
-                        <table class="table table-hover align-middle m-0">
+                        <table class="table table-hover align-middle m-0 text-nowrap">
                             <thead class="table-dark sticky-top">
                                 <tr>
                                     <th>Prioridad</th>
@@ -148,10 +163,21 @@
 
             <!-- VISTA 2: HISTORIAL DE ENTREGAS -->
             <div id="vista-historial" class="view-section">
-                <h3 class="fw-bold mb-4">Historial de Trabajos Entregados y Cancelados</h3>
+                <!-- CORRECCIÓN 2: Título y Menú desplegable para filtrar por saldo -->
+                <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+                    <h3 class="fw-bold m-0">Historial de Trabajos</h3>
+                    <select id="filtro-historial"
+                        class="form-select w-auto border-primary fw-bold text-primary shadow-sm">
+                        <option value="con_saldo" selected>🔍 Mostrar: Con Saldo Pendiente</option>
+                        <option value="todos">Mostrar: Todos (Histórico completo)</option>
+                        <option value="entregados">Mostrar: Pagados al 100%</option>
+                        <option value="cancelados">Mostrar: Cancelados</option>
+                    </select>
+                </div>
+
                 <div class="card shadow-sm border-0">
                     <div class="card-body table-responsive p-0" style="max-height: 600px; overflow-y: auto;">
-                        <table class="table table-hover align-middle m-0">
+                        <table class="table table-hover align-middle m-0 text-nowrap">
                             <thead class="table-light sticky-top shadow-sm">
                                 <tr>
                                     <th>Estado</th>
@@ -188,7 +214,9 @@
                                         </div>
                                         <div class="col-md-6 mt-3 mt-md-0">
                                             <label class="form-label fw-semibold">Fecha</label>
-                                            <input type="date" id="fecha-mov" class="form-control" required>
+                                            <input type="text" id="fecha-mov" class="form-control" required
+                                                placeholder="dd/mm/aaaa" onfocus="(this.type='date')"
+                                                onblur="(this.value === '' ? this.type='text' : this.type='date')">
                                         </div>
                                     </div>
                                     <div class="mb-3">
@@ -256,10 +284,14 @@
                                         <option value="entradas">Solo Entradas</option>
                                         <option value="salidas">Solo Salidas</option>
                                     </select></div>
-                                <div class="mb-2"><input type="date" id="filtro-inicio"
-                                        class="form-control form-control-sm" title="Desde"></div>
-                                <div class="mb-3"><input type="date" id="filtro-fin"
-                                        class="form-control form-control-sm" title="Hasta"></div>
+                                <div class="mb-2"><input type="text" id="filtro-inicio"
+                                        class="form-control form-control-sm" placeholder="Desde: dd/mm/aaaa"
+                                        onfocus="(this.type='date')"
+                                        onblur="(this.value === '' ? this.type='text' : this.type='date')"></div>
+                                <div class="mb-3"><input type="text" id="filtro-fin"
+                                        class="form-control form-control-sm" placeholder="Hasta: dd/mm/aaaa"
+                                        onfocus="(this.type='date')"
+                                        onblur="(this.value === '' ? this.type='text' : this.type='date')"></div>
                                 <div class="d-flex justify-content-center align-items-center mt-4">
                                     <canvas id="miGrafico" style="max-height: 250px;"></canvas>
                                 </div>
@@ -276,7 +308,7 @@
                                 </div>
                             </div>
                             <div class="card-body table-responsive p-0" style="max-height: 450px; overflow-y: auto;">
-                                <table class="table table-hover align-middle m-0">
+                                <table class="table table-hover align-middle m-0 text-nowrap">
                                     <thead class="table-light sticky-top shadow-sm">
                                         <tr>
                                             <th>Fecha</th>
@@ -315,11 +347,15 @@
                         <div class="row mb-3">
                             <div class="col-6">
                                 <label class="form-label fw-semibold text-muted small">Fecha Solicitud</label>
-                                <input type="date" id="ped-solicitado" class="form-control" required readonly>
+                                <input type="text" id="ped-solicitado" class="form-control" required readonly
+                                    onfocus="(this.type='date')"
+                                    onblur="(this.value === '' ? this.type='text' : this.type='date')">
                             </div>
                             <div class="col-6">
-                                <label class="form-label fw-bold text-primary small">Fecha de Entrega (Opcional)</label>
-                                <input type="date" id="ped-entrega" class="form-control border-primary">
+                                <label class="form-label fw-bold text-primary small">Fecha de Entrega</label>
+                                <input type="text" id="ped-entrega" class="form-control border-primary"
+                                    placeholder="dd/mm/aaaa" onfocus="(this.type='date')"
+                                    onblur="(this.value === '' ? this.type='text' : this.type='date')">
                             </div>
                         </div>
                         <div class="mb-3">
@@ -370,7 +406,9 @@
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Fecha</label>
-                                <input type="date" id="edit-fecha-mov" class="form-control" required>
+                                <input type="text" id="edit-fecha-mov" class="form-control" required
+                                    placeholder="dd/mm/aaaa" onfocus="(this.type='date')"
+                                    onblur="(this.value === '' ? this.type='text' : this.type='date')">
                             </div>
                         </div>
                         <div class="mb-3">
