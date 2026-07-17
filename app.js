@@ -35,6 +35,16 @@ let modalPedidoInstancia = null;
 let modalEditarMovInstancia = null;
 
 // ==========================================
+// NUEVO: FUNCIÓN PARA ZONA HORARIA LOCAL
+// ==========================================
+// Esto soluciona el desfase de horas para Costa Rica (UTC-6)
+function obtenerFechaLocal() {
+    const hoy = new Date();
+    const tzOffset = hoy.getTimezoneOffset() * 60000;
+    return new Date(hoy.getTime() - tzOffset).toISOString().split('T')[0];
+}
+
+// ==========================================
 // 3. AUTENTICACIÓN Y NAVEGACIÓN
 // ==========================================
 const vistas = {
@@ -109,7 +119,8 @@ window.abrirModalPedido = (id = null) => {
     const form = document.getElementById('form-pedido');
     form.reset();
     document.getElementById('ped-id').value = '';
-    document.getElementById('ped-solicitado').value = new Date().toISOString().split('T')[0];
+    // Usamos la fecha local exacta
+    document.getElementById('ped-solicitado').value = obtenerFechaLocal();
     document.getElementById('tituloModalPedido').textContent = 'Nuevo Pedido';
 
     if (id) {
@@ -190,6 +201,7 @@ function renderizarPedidos() {
             badgeClass = 'bg-secondary';
             prioridadTxt = 'Sin Fecha';
         } else {
+            // Aseguramos que el cálculo ignore la zona horaria añadiendo 'T00:00:00'
             const fEntregaDate = new Date(ped.fecha_entrega + 'T00:00:00');
             const diffDays = Math.ceil((fEntregaDate - hoy) / (1000 * 60 * 60 * 24));
 
@@ -236,7 +248,7 @@ document.getElementById('btn-limpiar-pedidos').addEventListener('click', () => {
 
 window.cancelarPedido = async (id) => {
     if ((await Swal.fire({ title: '¿Cancelar este pedido?', text: 'Pasará al historial como cancelado.', icon: 'warning', showCancelButton: true })).isConfirmed) {
-        await updateDoc(doc(db, "pedidos", id), { estado: 'Cancelado', fecha_cierre: new Date().toISOString().split('T')[0] });
+        await updateDoc(doc(db, "pedidos", id), { estado: 'Cancelado', fecha_cierre: obtenerFechaLocal() });
     }
 };
 
@@ -290,7 +302,7 @@ window.entregarPedido = async (id) => {
     }
 
     try {
-        const fechaHoy = new Date().toISOString().split('T')[0];
+        const fechaHoy = obtenerFechaLocal();
 
         await updateDoc(doc(db, "pedidos", id), {
             estado: 'Entregado',
@@ -342,7 +354,6 @@ function renderizarHistorialPedidos() {
             }
         }
 
-        // Se agregó el botón de borrar aquí
         html += `
             <tr>
                 <td><span class="badge ${badge}">${estadoTxt}</span></td>
@@ -383,7 +394,7 @@ window.abonarPedido = async (id) => {
 
             await addDoc(collection(db, "movimientos"), {
                 tipo: 'entrada',
-                fecha: new Date().toISOString().split('T')[0],
+                fecha: obtenerFechaLocal(),
                 descripcion: `Abono a deuda de pedido: ${ped.producto}`,
                 entidad: ped.cliente,
                 monto: montoAbono,
@@ -397,7 +408,6 @@ window.abonarPedido = async (id) => {
     }
 };
 
-// NUEVA FUNCIÓN: BORRAR DEL HISTORIAL
 window.borrarHistorialPedido = async (id) => {
     const result = await Swal.fire({
         title: '¿Eliminar del historial?',
@@ -423,7 +433,7 @@ window.borrarHistorialPedido = async (id) => {
 // ==========================================
 // 7. MÓDULO FINANCIERO (CAJA Y REPORTES)
 // ==========================================
-document.getElementById('fecha-mov').valueAsDate = new Date();
+document.getElementById('fecha-mov').value = obtenerFechaLocal();
 
 document.getElementById('form-movimiento').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -439,7 +449,7 @@ document.getElementById('form-movimiento').addEventListener('submit', async (e) 
             timestamp: new Date()
         });
         e.target.reset();
-        document.getElementById('fecha-mov').valueAsDate = new Date();
+        document.getElementById('fecha-mov').value = obtenerFechaLocal();
         Swal.fire({ icon: 'success', title: 'Guardado', timer: 1000, showConfirmButton: false });
     } catch (err) { Swal.fire('Error', 'No se guardó', 'error'); }
     finally { btnSubmit.disabled = false; }
