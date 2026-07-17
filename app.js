@@ -120,9 +120,7 @@ window.abrirModalPedido = (id = null) => {
     const form = document.getElementById('form-pedido');
     form.reset();
     document.getElementById('ped-id').value = '';
-    const pedSol = document.getElementById('ped-solicitado');
-    pedSol.type = 'date';
-    pedSol.value = obtenerFechaLocal();
+    document.getElementById('ped-solicitado').value = obtenerFechaLocal();
     document.getElementById('tituloModalPedido').textContent = 'Nuevo Pedido';
 
     if (id) {
@@ -130,12 +128,10 @@ window.abrirModalPedido = (id = null) => {
         if (ped) {
             document.getElementById('tituloModalPedido').textContent = 'Editar Pedido';
             document.getElementById('ped-id').value = ped.id;
-            pedSol.value = ped.fecha_solicitud;
+            document.getElementById('ped-solicitado').value = ped.fecha_solicitud;
 
-            const pedEnt = document.getElementById('ped-entrega');
             if (ped.fecha_entrega) {
-                pedEnt.type = 'date';
-                pedEnt.value = ped.fecha_entrega;
+                document.getElementById('ped-entrega').value = ped.fecha_entrega;
             }
 
             document.getElementById('ped-cliente').value = ped.cliente;
@@ -240,8 +236,8 @@ function renderizarPedidos() {
 ['filtro-pedido-texto', 'filtro-pedido-solicitud', 'filtro-pedido-entrega'].forEach(id => { document.getElementById(id).addEventListener('input', renderizarPedidos); });
 document.getElementById('btn-limpiar-pedidos').addEventListener('click', () => {
     document.getElementById('filtro-pedido-texto').value = '';
-    const fSol = document.getElementById('filtro-pedido-solicitud'); fSol.value = ''; fSol.type = 'text';
-    const fEnt = document.getElementById('filtro-pedido-entrega'); fEnt.value = ''; fEnt.type = 'text';
+    document.getElementById('filtro-pedido-solicitud').value = '';
+    document.getElementById('filtro-pedido-entrega').value = '';
     renderizarPedidos();
 });
 
@@ -307,10 +303,7 @@ filtroHistorial.addEventListener('change', renderizarHistorialPedidos);
 function renderizarHistorialPedidos() {
     if (!vistas.historial.classList.contains('active')) return;
 
-    // 1. Filtrar solo los que NO son Pendientes
     let historial = listaPedidos.filter(p => p.estado !== 'Pendiente').sort((a, b) => new Date(b.fecha_cierre) - new Date(a.fecha_cierre));
-
-    // 2. Aplicar el filtro desplegable (Por defecto mostrará "Con Saldo")
     const filtroActual = filtroHistorial.value;
 
     if (filtroActual === 'con_saldo') {
@@ -320,7 +313,6 @@ function renderizarHistorialPedidos() {
     } else if (filtroActual === 'cancelados') {
         historial = historial.filter(p => p.estado === 'Cancelado');
     }
-    // Si es "todos", no hace falta filtrar más.
 
     const tbody = document.getElementById('tabla-historial');
     let html = '';
@@ -403,6 +395,8 @@ window.borrarHistorialPedido = async (id) => {
 // ==========================================
 // 7. MÓDULO FINANCIERO (CAJA Y REPORTES)
 // ==========================================
+document.getElementById('fecha-mov').value = obtenerFechaLocal();
+
 document.getElementById('form-movimiento').addEventListener('submit', async (e) => {
     e.preventDefault();
     const btnSubmit = e.target.querySelector('button');
@@ -417,7 +411,7 @@ document.getElementById('form-movimiento').addEventListener('submit', async (e) 
             timestamp: new Date()
         });
         e.target.reset();
-        const fMov = document.getElementById('fecha-mov'); fMov.type = 'text'; fMov.value = '';
+        document.getElementById('fecha-mov').value = obtenerFechaLocal();
         Swal.fire({ icon: 'success', title: 'Guardado', timer: 1000, showConfirmButton: false });
     } catch (err) { Swal.fire('Error', 'No se guardó', 'error'); }
     finally { btnSubmit.disabled = false; }
@@ -474,7 +468,7 @@ window.editarMov = (id) => {
     if (!mov) return;
     document.getElementById('edit-id-mov').value = mov.id;
     document.getElementById('edit-tipo-mov').value = mov.tipo;
-    const fEdit = document.getElementById('edit-fecha-mov'); fEdit.type = 'date'; fEdit.value = mov.fecha;
+    document.getElementById('edit-fecha-mov').value = mov.fecha;
     document.getElementById('edit-desc-mov').value = mov.descripcion;
     document.getElementById('edit-ent-mov').value = mov.entidad || '';
     document.getElementById('edit-monto-mov').value = mov.monto;

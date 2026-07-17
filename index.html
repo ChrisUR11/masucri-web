@@ -45,7 +45,7 @@
             margin: 0 2px;
         }
 
-        /* CORRECCIÓN 1: Evitar que las tablas se pongan sobre el menú */
+        /* Evitar que las tablas se pongan sobre el menú */
         .navbar {
             z-index: 1030 !important;
         }
@@ -124,16 +124,11 @@
                         </div>
                         <div>
                             <label class="form-label small text-muted mb-1">Solicitado (Desde)</label>
-                            <!-- CORRECCIÓN 3: onfocus cambia a 'date' para evitar cuadro en blanco en cel -->
-                            <input type="text" id="filtro-pedido-solicitud" class="form-control form-control-sm"
-                                placeholder="dd/mm/aaaa" onfocus="(this.type='date')"
-                                onblur="(this.value === '' ? this.type='text' : this.type='date')">
+                            <input type="date" id="filtro-pedido-solicitud" class="form-control form-control-sm">
                         </div>
                         <div>
                             <label class="form-label small text-muted mb-1">Entrega (Hasta)</label>
-                            <input type="text" id="filtro-pedido-entrega" class="form-control form-control-sm"
-                                placeholder="dd/mm/aaaa" onfocus="(this.type='date')"
-                                onblur="(this.value === '' ? this.type='text' : this.type='date')">
+                            <input type="date" id="filtro-pedido-entrega" class="form-control form-control-sm">
                         </div>
                         <div>
                             <button id="btn-limpiar-pedidos" class="btn btn-sm btn-outline-secondary w-100">Limpiar
@@ -163,7 +158,6 @@
 
             <!-- VISTA 2: HISTORIAL DE ENTREGAS -->
             <div id="vista-historial" class="view-section">
-                <!-- CORRECCIÓN 2: Título y Menú desplegable para filtrar por saldo -->
                 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
                     <h3 class="fw-bold m-0">Historial de Trabajos</h3>
                     <select id="filtro-historial"
@@ -214,9 +208,7 @@
                                         </div>
                                         <div class="col-md-6 mt-3 mt-md-0">
                                             <label class="form-label fw-semibold">Fecha</label>
-                                            <input type="text" id="fecha-mov" class="form-control" required
-                                                placeholder="dd/mm/aaaa" onfocus="(this.type='date')"
-                                                onblur="(this.value === '' ? this.type='text' : this.type='date')">
+                                            <input type="date" id="fecha-mov" class="form-control" required>
                                         </div>
                                     </div>
                                     <div class="mb-3">
@@ -284,14 +276,10 @@
                                         <option value="entradas">Solo Entradas</option>
                                         <option value="salidas">Solo Salidas</option>
                                     </select></div>
-                                <div class="mb-2"><input type="text" id="filtro-inicio"
-                                        class="form-control form-control-sm" placeholder="Desde: dd/mm/aaaa"
-                                        onfocus="(this.type='date')"
-                                        onblur="(this.value === '' ? this.type='text' : this.type='date')"></div>
-                                <div class="mb-3"><input type="text" id="filtro-fin"
-                                        class="form-control form-control-sm" placeholder="Hasta: dd/mm/aaaa"
-                                        onfocus="(this.type='date')"
-                                        onblur="(this.value === '' ? this.type='text' : this.type='date')"></div>
+                                <div class="mb-2"><input type="date" id="filtro-inicio"
+                                        class="form-control form-control-sm" title="Desde"></div>
+                                <div class="mb-3"><input type="date" id="filtro-fin"
+                                        class="form-control form-control-sm" title="Hasta"></div>
                                 <div class="d-flex justify-content-center align-items-center mt-4">
                                     <canvas id="miGrafico" style="max-height: 250px;"></canvas>
                                 </div>
@@ -347,15 +335,11 @@
                         <div class="row mb-3">
                             <div class="col-6">
                                 <label class="form-label fw-semibold text-muted small">Fecha Solicitud</label>
-                                <input type="text" id="ped-solicitado" class="form-control" required readonly
-                                    onfocus="(this.type='date')"
-                                    onblur="(this.value === '' ? this.type='text' : this.type='date')">
+                                <input type="date" id="ped-solicitado" class="form-control" required readonly>
                             </div>
                             <div class="col-6">
                                 <label class="form-label fw-bold text-primary small">Fecha de Entrega</label>
-                                <input type="text" id="ped-entrega" class="form-control border-primary"
-                                    placeholder="dd/mm/aaaa" onfocus="(this.type='date')"
-                                    onblur="(this.value === '' ? this.type='text' : this.type='date')">
+                                <input type="date" id="ped-entrega" class="form-control border-primary">
                             </div>
                         </div>
                         <div class="mb-3">
@@ -406,9 +390,7 @@
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Fecha</label>
-                                <input type="text" id="edit-fecha-mov" class="form-control" required
-                                    placeholder="dd/mm/aaaa" onfocus="(this.type='date')"
-                                    onblur="(this.value === '' ? this.type='text' : this.type='date')">
+                                <input type="date" id="edit-fecha-mov" class="form-control" required>
                             </div>
                         </div>
                         <div class="mb-3">
