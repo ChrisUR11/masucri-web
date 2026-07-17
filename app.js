@@ -45,7 +45,6 @@ function obtenerFechaLocal() {
 }
 
 async function generarTicket(cliente, producto, precioTotal, deudaAnterior, abono, nuevoSaldo, estado, metodo) {
-    // 1. Llenar la plantilla HTML
     document.getElementById('tkt-fecha').textContent = obtenerFechaLocal();
     document.getElementById('tkt-cliente').textContent = cliente;
     document.getElementById('tkt-producto').textContent = producto;
@@ -55,28 +54,25 @@ async function generarTicket(cliente, producto, precioTotal, deudaAnterior, abon
     document.getElementById('tkt-metodo').textContent = metodo;
     document.getElementById('tkt-saldo').textContent = `₡${nuevoSaldo.toLocaleString('es-CR')}`;
 
-    // 2. Configurar la etiqueta de estado visualmente
     const divEstado = document.getElementById('tkt-estado');
     divEstado.textContent = estado;
 
     if (nuevoSaldo === 0) {
-        divEstado.style.background = '#198754'; // Verde para Cancelado
+        divEstado.style.background = '#198754';
         divEstado.style.color = '#ffffff';
     } else {
-        divEstado.style.background = '#ffc107'; // Amarillo para Saldo Pendiente
+        divEstado.style.background = '#ffc107';
         divEstado.style.color = '#000000';
     }
 
     const tktElement = document.getElementById('ticket-template');
 
     try {
-        // 3. Renderizar el HTML a un Canvas (Imagen)
         const canvas = await html2canvas(tktElement, {
             scale: 2,
             backgroundColor: '#ffffff'
         });
 
-        // 4. Descargar la imagen
         const link = document.createElement('a');
         link.download = `Recibo_${cliente.replace(/\s+/g, '_')}_${new Date().getTime()}.png`;
         link.href = canvas.toDataURL('image/png');
@@ -118,7 +114,6 @@ function cambiarVista(vistaActiva) {
     if (vistaActiva === 'historial') renderizarHistorialPedidos();
     if (vistaActiva === 'dashboard') renderizarDashboard();
 
-    // Auto-cerrar menú en móviles
     const navbarCollapse = document.getElementById('navbarNav');
     if (navbarCollapse.classList.contains('show')) {
         document.querySelector('.navbar-toggler').click();
@@ -289,10 +284,12 @@ function renderizarPedidos() {
                 <td class="fw-bold">${ped.cliente}</td>
                 <td>${ped.producto} <br><small class="text-muted">${ped.descripcion || ''}</small></td>
                 <td class="fw-bold">${textoPrecio}</td>
-                <td class="text-center text-nowrap">
-                    <button class="btn btn-outline-success btn-accion" onclick="window.entregarPedido('${ped.id}')" title="Entregar/Cobrar">✅</button>
-                    <button class="btn btn-outline-secondary btn-accion" onclick="window.abrirModalPedido('${ped.id}')" title="Editar">✏️</button>
-                    <button class="btn btn-outline-danger btn-accion" onclick="window.cancelarPedido('${ped.id}')" title="Anular Pedido">❌</button>
+                <td class="text-center align-middle">
+                    <div class="d-flex justify-content-center gap-1">
+                        <button class="btn btn-sm btn-outline-success" onclick="window.entregarPedido('${ped.id}')">Entregar</button>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="window.abrirModalPedido('${ped.id}')">Editar</button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="window.cancelarPedido('${ped.id}')">Anular</button>
+                    </div>
                 </td>
             </tr>
         `;
@@ -300,7 +297,6 @@ function renderizarPedidos() {
     tbody.innerHTML = html || '<tr><td colspan="6" class="text-center py-4 text-muted">No hay pedidos pendientes en este momento.</td></tr>';
 }
 
-// Filtros en tiempo real
 ['filtro-pedido-texto', 'filtro-pedido-solicitud', 'filtro-pedido-entrega'].forEach(id => {
     document.getElementById(id).addEventListener('input', renderizarPedidos);
 });
@@ -315,7 +311,7 @@ document.getElementById('btn-limpiar-pedidos').addEventListener('click', () => {
 window.cancelarPedido = async (id) => {
     const result = await Swal.fire({
         title: '¿Anular este pedido?',
-        text: 'Pasará al historial como un trabajo anulado/cancelado por el cliente.',
+        text: 'Pasará al historial como un trabajo anulado o cancelado por el cliente.',
         icon: 'warning',
         showCancelButton: true,
         confirmButtonText: 'Sí, anular',
@@ -336,7 +332,6 @@ window.entregarPedido = async (id) => {
 
     let precioTotal = ped.precio;
 
-    // Si estaba pendiente de precio, forzamos a que lo ponga primero
     if (!precioTotal || precioTotal === 0) {
         const { value: nuevoPrecioStr } = await Swal.fire({
             title: 'Fijar Precio Final',
@@ -353,21 +348,20 @@ window.entregarPedido = async (id) => {
         ped.precio = precioTotal;
     }
 
-    // Modal Único de Cobro Optimizado
     const result = await Swal.fire({
         title: 'Entregar Trabajo y Cobrar',
         html: `
             <div class="mb-3 text-start">
                 <label class="fw-bold">Monto pagado hoy (Total a cobrar: ₡${precioTotal.toLocaleString('es-CR')})</label>
                 <input id="swal-monto" type="number" class="form-control border-primary mt-1" value="${precioTotal}">
-                <small class="text-muted">Puedes cambiar el monto si el cliente solo deja un adelanto/abono.</small>
+                <small class="text-muted">Puedes cambiar el monto si el cliente solo deja un adelanto.</small>
             </div>
             <div class="mb-3 text-start">
                 <label class="fw-bold">Método de Pago</label>
                 <select id="swal-metodo" class="form-select border-primary mt-1">
-                    <option value="Efectivo">Efectivo 💵</option>
-                    <option value="Sinpe Móvil">Sinpe Móvil 📱</option>
-                    <option value="Transferencia">Transferencia 🏦</option>
+                    <option value="Efectivo">Efectivo</option>
+                    <option value="Sinpe Móvil">Sinpe Móvil</option>
+                    <option value="Transferencia">Transferencia</option>
                 </select>
             </div>
         `,
@@ -392,14 +386,12 @@ window.entregarPedido = async (id) => {
         const fechaHoy = obtenerFechaLocal();
 
         try {
-            // Actualizar pedido
             await updateDoc(doc(db, "pedidos", id), {
                 estado: 'Entregado',
                 monto_pagado: montoCobrado,
                 fecha_cierre: fechaHoy
             });
 
-            // Ingresar dinero a caja
             if (montoCobrado > 0) {
                 await addDoc(collection(db, "movimientos"), {
                     tipo: 'entrada',
@@ -412,30 +404,28 @@ window.entregarPedido = async (id) => {
                 });
             }
 
-            // Lógica para el Estado del Ticket
             const saldoRestante = precioTotal - montoCobrado;
             let textoEstado = '';
             if (saldoRestante <= 0) {
-                textoEstado = '¡CANCELADO EN SU TOTALIDAD!';
+                textoEstado = 'CANCELADO EN SU TOTALIDAD';
             } else {
                 textoEstado = 'ABONO REGISTRADO - QUEDA SALDO';
             }
 
             Swal.fire({
-                title: '¡Operación Exitosa!',
-                text: '¿Deseas descargar el recibo como imagen para enviarlo por WhatsApp?',
+                title: 'Operación Exitosa',
+                text: '¿Deseas descargar el recibo como imagen para enviarlo?',
                 icon: 'success',
                 showCancelButton: true,
                 confirmButtonText: 'Sí, descargar ticket',
                 cancelButtonText: 'No, terminar'
             }).then((resDescarga) => {
                 if (resDescarga.isConfirmed) {
-                    // Generamos el ticket pasando los datos
                     generarTicket(
                         ped.cliente,
                         ped.producto,
                         precioTotal,
-                        precioTotal, // La deuda anterior era el total del precio
+                        precioTotal,
                         montoCobrado,
                         Math.max(0, saldoRestante),
                         textoEstado,
@@ -465,9 +455,9 @@ window.abonarPedido = async (id) => {
             <div class="mb-3 text-start">
                 <label class="fw-bold">Método de Pago</label>
                 <select id="swal-metodo" class="form-select mt-1">
-                    <option value="Efectivo">Efectivo 💵</option>
-                    <option value="Sinpe Móvil">Sinpe Móvil 📱</option>
-                    <option value="Transferencia">Transferencia 🏦</option>
+                    <option value="Efectivo">Efectivo</option>
+                    <option value="Sinpe Móvil">Sinpe Móvil</option>
+                    <option value="Transferencia">Transferencia</option>
                 </select>
             </div>
         `,
@@ -491,10 +481,8 @@ window.abonarPedido = async (id) => {
         const saldoRestante = ped.precio - totalPagadoAcumulado;
 
         try {
-            // Actualizar pedido
             await updateDoc(doc(db, "pedidos", id), { monto_pagado: totalPagadoAcumulado });
 
-            // Ingresar abono a caja
             await addDoc(collection(db, "movimientos"), {
                 tipo: 'entrada',
                 metodo_pago: metodoPago,
@@ -507,13 +495,13 @@ window.abonarPedido = async (id) => {
 
             let textoEstado = '';
             if (saldoRestante <= 0) {
-                textoEstado = '¡CANCELADO EN SU TOTALIDAD!';
+                textoEstado = 'CANCELADO EN SU TOTALIDAD';
             } else {
                 textoEstado = 'ABONO REGISTRADO - QUEDA SALDO';
             }
 
             Swal.fire({
-                title: '¡Abono registrado en caja!',
+                title: 'Abono registrado',
                 text: '¿Deseas descargar el comprobante del abono?',
                 icon: 'success',
                 showCancelButton: true,
@@ -548,17 +536,15 @@ selectFiltroHistorial.addEventListener('change', renderizarHistorialPedidos);
 function renderizarHistorialPedidos() {
     if (!vistas.historial.classList.contains('active')) return;
 
-    // Filtrar primero los que ya no están pendientes
     let historial = listaPedidos.filter(p => p.estado !== 'Pendiente').sort((a, b) => new Date(b.fecha_cierre) - new Date(a.fecha_cierre));
     const tipoFiltro = selectFiltroHistorial.value;
 
-    // Aplicar filtro secundario
     if (tipoFiltro === 'con_saldo') {
         historial = historial.filter(p => p.estado === 'Entregado' && (p.precio - (p.monto_pagado || 0)) > 0);
     } else if (tipoFiltro === 'entregados') {
         historial = historial.filter(p => p.estado === 'Entregado' && (p.precio - (p.monto_pagado || 0)) <= 0);
     } else if (tipoFiltro === 'anulados') {
-        historial = historial.filter(p => p.estado === 'Cancelado'); // Trabajos que no se hicieron
+        historial = historial.filter(p => p.estado === 'Cancelado');
     }
 
     const tbody = document.getElementById('tabla-historial');
@@ -576,7 +562,7 @@ function renderizarHistorialPedidos() {
                 badgeColor = 'bg-warning text-dark';
                 textoEstado = 'Con Saldo';
                 textoPago += `<br><small class="text-danger fw-bold">Debe: ₡${deuda.toLocaleString('es-CR')}</small>`;
-                btnAbonar = `<button class="btn btn-sm btn-success w-100 mt-1 mb-1" onclick="window.abonarPedido('${ped.id}')">💰 Abonar</button>`;
+                btnAbonar = `<button class="btn btn-sm btn-success" onclick="window.abonarPedido('${ped.id}')">Abonar</button>`;
             } else if (deuda < 0) {
                 textoPago += `<br><small class="text-success fw-bold">+ Propina: ₡${Math.abs(deuda).toLocaleString('es-CR')}</small>`;
             }
@@ -590,8 +576,10 @@ function renderizarHistorialPedidos() {
                 <td>${ped.producto}</td>
                 <td>${ped.estado === 'Cancelado' ? '-' : textoPago}</td>
                 <td class="text-center align-middle">
-                    ${btnAbonar}
-                    <button class="btn btn-sm btn-outline-danger w-100" onclick="window.borrarHistorialPedido('${ped.id}')" title="Borrar registro permanentemente">🗑️ Eliminar</button>
+                    <div class="d-flex justify-content-center gap-2">
+                        ${btnAbonar}
+                        <button class="btn btn-sm btn-outline-danger" onclick="window.borrarHistorialPedido('${ped.id}')">Eliminar</button>
+                    </div>
                 </td>
             </tr>
         `;
@@ -602,7 +590,7 @@ function renderizarHistorialPedidos() {
 window.borrarHistorialPedido = async (id) => {
     const result = await Swal.fire({
         title: '¿Eliminar del sistema?',
-        text: 'Se borrará el registro del pedido de forma permanente. Recuerda que los movimientos financieros ligados en caja no se borrarán automáticamente.',
+        text: 'Se borrará el registro permanentemente. Los movimientos en caja no se borrarán.',
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#d33',
@@ -688,9 +676,11 @@ function generarReporteFinanciero() {
                 <td class="text-nowrap">${m.fecha}</td>
                 <td><strong>${m.descripcion}</strong> ${badgeMetodo}<br><small class="text-muted">${m.entidad || ''}</small></td>
                 <td class="${m.tipo === 'entrada' ? 'text-success' : 'text-danger'} fw-bold text-nowrap">₡${m.monto.toLocaleString('es-CR')}</td>
-                <td class="text-center text-nowrap">
-                    <button class="btn btn-sm btn-outline-secondary btn-accion" onclick="window.editarMov('${m.id}')" title="Editar">✏️</button>
-                    <button class="btn btn-sm btn-outline-danger btn-accion" onclick="window.borrarMov('${m.id}')" title="Borrar">🗑️</button>
+                <td class="text-center align-middle">
+                    <div class="d-flex justify-content-center gap-1">
+                        <button class="btn btn-sm btn-outline-secondary" onclick="window.editarMov('${m.id}')">Editar</button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="window.borrarMov('${m.id}')">Eliminar</button>
+                    </div>
                 </td>
             </tr>
         `;
@@ -788,16 +778,15 @@ function renderizarDashboard() {
         }
     });
 
-    // Ordenar de mayor a menor y tomar los primeros 5
     const topClientes = Object.entries(clientesMap).sort((a, b) => b[1].totalComprado - a[1].totalComprado).slice(0, 5);
     let htmlCRM = '';
 
     topClientes.forEach((clienteObj, index) => {
-        let iconoMedalla = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '⭐';
+        let posicion = (index + 1) + '.';
         htmlCRM += `
             <li class="list-group-item d-flex justify-content-between align-items-start">
                 <div class="ms-2 me-auto">
-                    <div class="fw-bold">${iconoMedalla} ${clienteObj[0]}</div>
+                    <div class="fw-bold">${posicion} ${clienteObj[0]}</div>
                     <span class="small text-muted">Última compra: ${clienteObj[1].ultimaCompra} (${clienteObj[1].cantidadPedidos} pedidos)</span>
                 </div>
                 <span class="badge bg-success rounded-pill">₡${clienteObj[1].totalComprado.toLocaleString('es-CR')}</span>
@@ -810,7 +799,6 @@ function renderizarDashboard() {
     // B. VOLATILIDAD (Desviación Estándar Poblacional)
     const ingresosPorMes = {};
 
-    // Agrupar ingresos de la caja por mes (ej. "2026-07")
     listaMovimientos.filter(m => m.tipo === 'entrada').forEach(m => {
         const mesAnio = m.fecha.substring(0, 7);
         ingresosPorMes[mesAnio] = (ingresosPorMes[mesAnio] || 0) + m.monto;
@@ -831,12 +819,10 @@ function renderizarDashboard() {
         const sumatoria = valoresMeses.reduce((a, b) => a + b, 0);
         const mediaPoblacional = sumatoria / N;
 
-        // Fórmula Varianza: Σ(xi - μ)² / N
         const sumatoriaDiferenciasAlCuadrado = valoresMeses.reduce((acc, val) => acc + Math.pow(val - mediaPoblacional, 2), 0);
         const varianzaPoblacional = sumatoriaDiferenciasAlCuadrado / N;
         const desviacionEstandar = Math.sqrt(varianzaPoblacional);
 
-        // Coeficiente de Variación = σ / μ
         const coeficienteVariacion = desviacionEstandar / mediaPoblacional;
 
         document.getElementById('stat-media').textContent = `₡${Math.round(mediaPoblacional).toLocaleString('es-CR')}`;
@@ -844,16 +830,16 @@ function renderizarDashboard() {
 
         if (coeficienteVariacion > 0.4) {
             boxAlerta.className = 'alert alert-danger text-center py-2 mb-3 fw-bold';
-            boxAlerta.innerHTML = '⚠️ Alta Volatilidad Detectada';
-            txtRecomendacion.innerHTML = 'Tus ingresos mensuales varían de forma brusca e impredecible. <strong>Sugerencia clave:</strong> Necesitas crear un fondo de emergencia empresarial que cubra los gastos fijos de MASUCRI para los meses bajos.';
+            boxAlerta.innerHTML = 'Alta Volatilidad Detectada';
+            txtRecomendacion.innerHTML = 'Tus ingresos mensuales varían de forma brusca e impredecible. Sugerencia clave: Necesitas crear un fondo de emergencia empresarial que cubra los gastos fijos de MASUCRI para los meses bajos.';
         } else if (coeficienteVariacion > 0.15) {
             boxAlerta.className = 'alert alert-warning text-center py-2 mb-3 fw-bold text-dark';
-            boxAlerta.innerHTML = '⚖️ Volatilidad Moderada';
-            txtRecomendacion.innerHTML = 'Flujo de caja normal para un emprendimiento. Mantén reservas estándar y enfócate en fidelizar a tus clientes "Top" para asegurar entradas estables.';
+            boxAlerta.innerHTML = 'Volatilidad Moderada';
+            txtRecomendacion.innerHTML = 'Flujo de caja normal para un emprendimiento. Mantén reservas estándar y enfócate en fidelizar a tus clientes Top para asegurar entradas estables.';
         } else {
             boxAlerta.className = 'alert alert-success text-center py-2 mb-3 fw-bold';
-            boxAlerta.innerHTML = '✅ Ingresos Altamente Estables';
-            txtRecomendacion.innerHTML = '¡Excelente! Tus ventas son predecibles mes a mes. Este es el momento ideal para pensar en invertir (ej. comprar equipo de sublimación nuevo) sin desestabilizar tus finanzas.';
+            boxAlerta.innerHTML = 'Ingresos Altamente Estables';
+            txtRecomendacion.innerHTML = 'Excelente. Tus ventas son predecibles mes a mes. Este es el momento ideal para pensar en invertir sin desestabilizar tus finanzas.';
         }
     }
 

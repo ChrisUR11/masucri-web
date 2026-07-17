@@ -35,16 +35,6 @@
             display: block;
         }
 
-        .btn-accion {
-            width: 32px;
-            height: 32px;
-            padding: 0;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 2px;
-        }
-
         .navbar {
             z-index: 1030 !important;
         }
@@ -166,7 +156,7 @@
                         <li class="nav-item"><a class="nav-link" href="#" id="nav-historial">Historial</a></li>
                         <li class="nav-item"><a class="nav-link" href="#" id="nav-registro">Caja</a></li>
                         <li class="nav-item"><a class="nav-link" href="#" id="nav-reportes">Finanzas</a></li>
-                        <li class="nav-item"><a class="nav-link fw-bold text-warning" href="#" id="nav-dashboard">📊 BI
+                        <li class="nav-item"><a class="nav-link fw-bold text-warning" href="#" id="nav-dashboard">BI
                                 MASUCRI</a></li>
                     </ul>
                     <div class="d-flex align-items-center mt-2 mt-lg-0">
@@ -183,8 +173,7 @@
             <div id="vista-pedidos" class="view-section active">
                 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
                     <h3 class="fw-bold m-0">Pedidos Pendientes</h3>
-                    <button class="btn btn-primary fw-bold shadow-sm" onclick="abrirModalPedido()">+ Nuevo
-                        Pedido</button>
+                    <button class="btn btn-primary fw-bold shadow-sm" onclick="abrirModalPedido()">Nuevo Pedido</button>
                 </div>
 
                 <div class="card shadow-sm mb-4 border-0">
@@ -226,7 +215,7 @@
                     <h3 class="fw-bold m-0">Historial de Trabajos</h3>
                     <select id="filtro-historial"
                         class="form-select w-auto border-primary fw-bold text-primary shadow-sm">
-                        <option value="con_saldo" selected>🔍 Mostrar: Con Saldo Pendiente</option>
+                        <option value="con_saldo" selected>Mostrar: Con Saldo Pendiente</option>
                         <option value="todos">Mostrar: Todos</option>
                         <option value="entregados">Mostrar: Cancelados al 100%</option>
                         <option value="anulados">Mostrar: Anulados/Eliminados</option>
@@ -275,9 +264,9 @@
                                         <div class="col-md-4 mt-3 mt-md-0">
                                             <label class="form-label fw-semibold text-primary">Método de Pago</label>
                                             <select id="metodo-pago-mov" class="form-select border-primary" required>
-                                                <option value="Efectivo">Efectivo 💵</option>
-                                                <option value="Sinpe Móvil">Sinpe Móvil 📱</option>
-                                                <option value="Transferencia">Transferencia 🏦</option>
+                                                <option value="Efectivo">Efectivo</option>
+                                                <option value="Sinpe Móvil">Sinpe Móvil</option>
+                                                <option value="Transferencia">Transferencia</option>
                                             </select>
                                         </div>
                                     </div>
@@ -379,8 +368,7 @@
                     <!-- CRM: Perfiles de Clientes -->
                     <div class="col-lg-6 mb-4">
                         <div class="card shadow-sm border-0 h-100">
-                            <div class="card-header bg-dark text-white fw-bold">🏆 Top 5 Mejores Clientes (Histórico)
-                            </div>
+                            <div class="card-header bg-dark text-white fw-bold">Top 5 Mejores Clientes (Histórico)</div>
                             <div class="card-body p-0">
                                 <ul class="list-group list-group-flush" id="lista-crm-clientes"></ul>
                             </div>
@@ -390,7 +378,7 @@
                     <!-- ESTADÍSTICA: Desviación Estándar -->
                     <div class="col-lg-6 mb-4">
                         <div class="card shadow-sm border-0 h-100">
-                            <div class="card-header bg-primary text-white fw-bold">📈 Análisis de Volatilidad (Ingresos)
+                            <div class="card-header bg-primary text-white fw-bold">Análisis de Volatilidad (Ingresos)
                             </div>
                             <div class="card-body d-flex flex-column justify-content-center">
                                 <p class="text-muted small mb-2">Evalúa qué tan inestable es tu flujo de caja mensual
@@ -419,7 +407,7 @@
                     <!-- ESTACIONALIDAD -->
                     <div class="col-12 mb-4">
                         <div class="card shadow-sm border-0">
-                            <div class="card-header bg-white fw-bold">🛍️ Categorías Más Vendidas</div>
+                            <div class="card-header bg-white fw-bold">Categorías Más Vendidas</div>
                             <div class="card-body">
                                 <canvas id="graficoEstacionalidad" style="max-height: 300px;"></canvas>
                             </div>
@@ -473,7 +461,7 @@
 
         <div class="ticket-footer">
             <span id="tkt-estado" class="badge-estado"></span>
-            <p style="margin-top: 20px; font-size: 14px; color: #555;">¡Gracias por preferir a MASUCRI!</p>
+            <p style="margin-top: 20px; font-size: 14px; color: #555;">Gracias por preferir a MASUCRI</p>
         </div>
     </div>
 
