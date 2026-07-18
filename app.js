@@ -84,7 +84,6 @@ async function generarTicket(cliente, producto, precioTotal, deudaAnterior, abon
                     await navigator.share({
                         files: [file],
                         title: 'Comprobante MASUCRI',
-                        text: '¡Hola! Te adjunto el comprobante de tu trabajo en MASUCRI.'
                     });
                 } catch (err) {
                     console.log("Se canceló el menú de compartir:", err);
