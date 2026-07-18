@@ -47,6 +47,7 @@ function obtenerFechaLocal() {
 async function generarTicket(cliente, producto, precioTotal, deudaAnterior, abono, nuevoSaldo, estado, metodo) {
     document.getElementById('tkt-fecha').textContent = obtenerFechaLocal();
     document.getElementById('tkt-cliente').textContent = cliente;
+    // Solo mostramos el producto, ocultando las descripciones/apuntes personales
     document.getElementById('tkt-producto').textContent = producto;
     document.getElementById('tkt-precio-total').textContent = `₡${precioTotal.toLocaleString('es-CR')}`;
     document.getElementById('tkt-anterior').textContent = `₡${deudaAnterior.toLocaleString('es-CR')}`;
@@ -73,10 +74,42 @@ async function generarTicket(cliente, producto, precioTotal, deudaAnterior, abon
             backgroundColor: '#ffffff'
         });
 
-        const link = document.createElement('a');
-        link.download = `Recibo_${cliente.replace(/\s+/g, '_')}_${new Date().getTime()}.png`;
-        link.href = canvas.toDataURL('image/png');
-        link.click();
+        // Convertir la imagen a un Blob para poder compartirla nativamente
+        canvas.toBlob(async (blob) => {
+            const file = new File([blob], `Ticket_${cliente.replace(/\s+/g, '_')}.png`, { type: 'image/png' });
+
+            // Verificar si el teléfono/navegador soporta compartir archivos directamente
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                try {
+                    await navigator.share({
+                        files: [file],
+                        title: 'Comprobante MASUCRI',
+                        text: '¡Hola! Te adjunto el comprobante de tu trabajo en MASUCRI.'
+                    });
+                } catch (err) {
+                    console.log("Se canceló el menú de compartir:", err);
+                }
+            } else {
+                // FALLBACK: Si es una compu vieja que no soporta compartir, lo descarga y ofrece abrir WhatsApp Web
+                const link = document.createElement('a');
+                link.download = file.name;
+                link.href = URL.createObjectURL(blob);
+                link.click();
+
+                Swal.fire({
+                    title: 'Imagen Descargada',
+                    text: 'Tu navegador no soporta envío directo. La imagen se descargó para que la adjuntes en WhatsApp Web.',
+                    icon: 'info',
+                    confirmButtonText: 'Abrir WhatsApp Web',
+                    showCancelButton: true,
+                    cancelButtonText: 'Cerrar'
+                }).then((r) => {
+                    if (r.isConfirmed) {
+                        window.open('https://web.whatsapp.com/', '_blank');
+                    }
+                });
+            }
+        }, 'image/png');
     } catch (error) {
         console.error("Error generando ticket:", error);
         Swal.fire('Error', 'No se pudo generar la imagen del recibo.', 'error');
@@ -173,6 +206,9 @@ function cargarPedidos() {
         renderizarPedidos();
         renderizarHistorialPedidos();
         if (vistas.dashboard.classList.contains('active')) renderizarDashboard();
+    }, (error) => {
+        // Manejador de error para reglas de seguridad
+        if (error.code === 'permission-denied') Swal.fire('Seguridad', 'Las reglas de Firebase bloquearon el acceso. Comprueba que seas admin.', 'error');
     });
 }
 
@@ -414,10 +450,10 @@ window.entregarPedido = async (id) => {
 
             Swal.fire({
                 title: 'Operación Exitosa',
-                text: '¿Deseas descargar el recibo como imagen para enviarlo?',
+                text: '¿Deseas compartir el recibo con el cliente?',
                 icon: 'success',
                 showCancelButton: true,
-                confirmButtonText: 'Sí, descargar ticket',
+                confirmButtonText: 'Sí, enviar ticket',
                 cancelButtonText: 'No, terminar'
             }).then((resDescarga) => {
                 if (resDescarga.isConfirmed) {
@@ -502,10 +538,10 @@ window.abonarPedido = async (id) => {
 
             Swal.fire({
                 title: 'Abono registrado',
-                text: '¿Deseas descargar el comprobante del abono?',
+                text: '¿Deseas enviar el comprobante del abono al cliente?',
                 icon: 'success',
                 showCancelButton: true,
-                confirmButtonText: 'Sí, descargar recibo',
+                confirmButtonText: 'Sí, enviar ticket',
                 cancelButtonText: 'Cerrar'
             }).then((resDescarga) => {
                 if (resDescarga.isConfirmed) {
@@ -555,14 +591,16 @@ function renderizarHistorialPedidos() {
         let textoEstado = ped.estado;
         const deuda = (ped.precio || 0) - (ped.monto_pagado || 0);
         let textoPago = `Pagado: ₡${(ped.monto_pagado || 0).toLocaleString('es-CR')}`;
-        let btnAbonar = '';
+
+        // Nuevo botón para reimprimir/enviar el ticket desde el historial
+        let botonesAccion = `<button class="btn btn-sm btn-outline-info" onclick="window.reimprimirTicket('${ped.id}')">Enviar Ticket</button>`;
 
         if (ped.estado === 'Entregado') {
             if (deuda > 0) {
                 badgeColor = 'bg-warning text-dark';
                 textoEstado = 'Con Saldo';
                 textoPago += `<br><small class="text-danger fw-bold">Debe: ₡${deuda.toLocaleString('es-CR')}</small>`;
-                btnAbonar = `<button class="btn btn-sm btn-success" onclick="window.abonarPedido('${ped.id}')">Abonar</button>`;
+                botonesAccion += `<button class="btn btn-sm btn-success" onclick="window.abonarPedido('${ped.id}')">Abonar</button>`;
             } else if (deuda < 0) {
                 textoPago += `<br><small class="text-success fw-bold">+ Propina: ₡${Math.abs(deuda).toLocaleString('es-CR')}</small>`;
             }
@@ -577,7 +615,7 @@ function renderizarHistorialPedidos() {
                 <td>${ped.estado === 'Cancelado' ? '-' : textoPago}</td>
                 <td class="text-center align-middle">
                     <div class="d-flex justify-content-center gap-2">
-                        ${btnAbonar}
+                        ${botonesAccion}
                         <button class="btn btn-sm btn-outline-danger" onclick="window.borrarHistorialPedido('${ped.id}')">Eliminar</button>
                     </div>
                 </td>
@@ -586,6 +624,28 @@ function renderizarHistorialPedidos() {
     });
     tbody.innerHTML = html || `<tr><td colspan="6" class="text-center py-4 text-muted">No hay registros con la opción seleccionada.</td></tr>`;
 }
+
+// NUEVA FUNCIÓN: Genera un ticket reflejando el estado actual desde el historial
+window.reimprimirTicket = (id) => {
+    const ped = listaPedidos.find(p => p.id === id);
+    if (!ped) return;
+
+    const precioTotal = ped.precio || 0;
+    const pagado = ped.monto_pagado || 0;
+    const saldoRestante = precioTotal - pagado;
+    let textoEstado = saldoRestante <= 0 ? 'CANCELADO EN SU TOTALIDAD' : 'SALDO PENDIENTE';
+
+    generarTicket(
+        ped.cliente,
+        ped.producto,
+        precioTotal,
+        precioTotal,
+        pagado,
+        Math.max(0, saldoRestante),
+        textoEstado,
+        "Estado Actualizado"
+    );
+};
 
 window.borrarHistorialPedido = async (id) => {
     const result = await Swal.fire({
@@ -644,7 +704,7 @@ function cargarFinanzas() {
         snapshot.forEach(doc => listaMovimientos.push({ id: doc.id, ...doc.data() }));
         if (vistas.reportes.classList.contains('active')) generarReporteFinanciero();
         if (vistas.dashboard.classList.contains('active')) renderizarDashboard();
-    });
+    }, (error) => { /* Fallo capturado arriba en pedidos */ });
 }
 
 const filtroModoFinanzas = document.getElementById('filtro-modo');
