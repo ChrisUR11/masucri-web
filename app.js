@@ -44,7 +44,10 @@ function obtenerFechaLocal() {
     return new Date(hoy.getTime() - tzOffset).toISOString().split('T')[0];
 }
 
-async function generarTicket(cliente, producto, precioTotal, deudaAnterior, abono, nuevoSaldo, estado, metodo) {
+async function generarTicket(ticketId, cliente, producto, precioTotal, deudaAnterior, abono, nuevoSaldo, estado, metodo) {
+    const elConsecutivo = document.getElementById('tkt-consecutivo');
+    if (elConsecutivo) elConsecutivo.textContent = ticketId;
+
     document.getElementById('tkt-fecha').textContent = obtenerFechaLocal();
     document.getElementById('tkt-cliente').textContent = cliente;
     // Solo mostramos el producto, ocultando las descripciones/apuntes personales
@@ -179,8 +182,11 @@ onAuthStateChanged(auth, async (user) => {
         document.getElementById('app-container').classList.add('d-flex');
         document.getElementById('user-info').textContent = `Admin: ${user.displayName}`;
 
-        modalPedidoInstancia = new bootstrap.Modal(document.getElementById('modalPedido'));
-        modalEditarMovInstancia = new bootstrap.Modal(document.getElementById('modalEditarMov'));
+        const elModalPed = document.getElementById('modalPedido');
+        if (elModalPed) modalPedidoInstancia = new bootstrap.Modal(elModalPed);
+
+        const elModalMov = document.getElementById('modalEditarMov');
+        if (elModalMov) modalEditarMovInstancia = new bootstrap.Modal(elModalMov);
 
         cargarPedidos();
         cargarFinanzas();
@@ -231,7 +237,7 @@ window.abrirModalPedido = (id = null) => {
             document.getElementById('ped-precio').value = ped.precio || '';
         }
     }
-    modalPedidoInstancia.show();
+    if (modalPedidoInstancia) modalPedidoInstancia.show();
 };
 
 document.getElementById('form-pedido').addEventListener('submit', async (e) => {
@@ -263,7 +269,7 @@ document.getElementById('form-pedido').addEventListener('submit', async (e) => {
             datos.timestamp = new Date();
             await addDoc(collection(db, "pedidos"), datos);
         }
-        modalPedidoInstancia.hide();
+        if (modalPedidoInstancia) modalPedidoInstancia.hide();
         Swal.fire({ icon: 'success', title: 'Guardado correctamente', timer: 1000, showConfirmButton: false });
     } catch (e) {
         Swal.fire('Error', 'No se pudo guardar el pedido.', 'error');
@@ -457,6 +463,7 @@ window.entregarPedido = async (id) => {
             }).then((resDescarga) => {
                 if (resDescarga.isConfirmed) {
                     generarTicket(
+                        ped.id.slice(-5).toUpperCase(), // Ticket ID 
                         ped.cliente,
                         ped.producto,
                         precioTotal,
@@ -545,6 +552,7 @@ window.abonarPedido = async (id) => {
             }).then((resDescarga) => {
                 if (resDescarga.isConfirmed) {
                     generarTicket(
+                        ped.id.slice(-5).toUpperCase(), // Ticket ID
                         ped.cliente,
                         ped.producto,
                         ped.precio,
@@ -635,6 +643,7 @@ window.reimprimirTicket = (id) => {
     let textoEstado = saldoRestante <= 0 ? 'CANCELADO EN SU TOTALIDAD' : 'SALDO PENDIENTE';
 
     generarTicket(
+        ped.id.slice(-5).toUpperCase(), // Ticket ID
         ped.cliente,
         ped.producto,
         precioTotal,
@@ -757,31 +766,41 @@ window.editarMov = (id) => {
     const mov = listaMovimientos.find(m => m.id === id);
     if (!mov) return;
 
-    document.getElementById('edit-id-mov').value = mov.id;
-    document.getElementById('edit-tipo-mov').value = mov.tipo;
-    document.getElementById('edit-fecha-mov').value = mov.fecha;
-    document.getElementById('edit-desc-mov').value = mov.descripcion;
-    document.getElementById('edit-ent-mov').value = mov.entidad || '';
-    document.getElementById('edit-monto-mov').value = mov.monto;
+    // Se asignan valores de forma defensiva para evitar fallos si el HTML está incompleto
+    const setVal = (idEl, val) => { const el = document.getElementById(idEl); if (el) el.value = val; };
 
-    if (mov.metodo_pago) document.getElementById('edit-metodo-mov').value = mov.metodo_pago;
+    setVal('edit-id-mov', mov.id);
+    setVal('edit-tipo-mov', mov.tipo);
+    setVal('edit-fecha-mov', mov.fecha);
+    setVal('edit-desc-mov', mov.descripcion);
+    setVal('edit-ent-mov', mov.entidad || '');
+    setVal('edit-monto-mov', mov.monto);
+    setVal('edit-metodo-mov', mov.metodo_pago || 'Efectivo');
 
-    modalEditarMovInstancia.show();
+    if (modalEditarMovInstancia) {
+        modalEditarMovInstancia.show();
+    } else {
+        Swal.fire('Error HTML', 'No se encontró el modal de edición en el index.html', 'error');
+    }
 };
 
 document.getElementById('form-editar-mov').addEventListener('submit', async (e) => {
     e.preventDefault();
     const id = document.getElementById('edit-id-mov').value;
+
+    // Función segura para leer datos del HTML
+    const getVal = (idEl, defaultVal) => { const el = document.getElementById(idEl); return el ? el.value : defaultVal; };
+
     try {
         await updateDoc(doc(db, "movimientos", id), {
-            tipo: document.getElementById('edit-tipo-mov').value,
-            fecha: document.getElementById('edit-fecha-mov').value,
-            descripcion: document.getElementById('edit-desc-mov').value.trim(),
-            metodo_pago: document.getElementById('edit-metodo-mov').value,
-            entidad: document.getElementById('edit-ent-mov').value.trim(),
-            monto: parseFloat(document.getElementById('edit-monto-mov').value)
+            tipo: getVal('edit-tipo-mov', 'entrada'),
+            fecha: getVal('edit-fecha-mov', obtenerFechaLocal()),
+            descripcion: getVal('edit-desc-mov', '').trim(),
+            metodo_pago: getVal('edit-metodo-mov', 'Efectivo'),
+            entidad: getVal('edit-ent-mov', '').trim(),
+            monto: parseFloat(getVal('edit-monto-mov', 0))
         });
-        modalEditarMovInstancia.hide();
+        if (modalEditarMovInstancia) modalEditarMovInstancia.hide();
         Swal.fire({ icon: 'success', title: 'Registro actualizado', timer: 1500, showConfirmButton: false });
     } catch (error) {
         Swal.fire('Error', 'No se pudo actualizar.', 'error');

@@ -433,6 +433,11 @@
             <p><strong>Detalle:</strong> <span id="tkt-producto"></span></p>
         </div>
 
+        <div class="ticket-row">
+            <span>Comprobante N°:</span>
+            <strong id="tkt-consecutivo"></strong>
+        </div>
+
         <div class="ticket-caja">
             <h4 style="text-align: center; margin: 0 0 15px 0;">ESTADO DE CUENTA</h4>
 
@@ -509,50 +514,52 @@
         </div>
     </div>
 
-    <!-- MODAL: EDITAR MOVIMIENTO FINANCIERO -->
+    <!-- Modal Editar Movimiento -->
     <div class="modal fade" id="modalEditarMov" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
-            <div class="modal-content border-0 shadow">
-                <div class="modal-header bg-warning">
-                    <h5 class="modal-title fw-bold">Editar Movimiento</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <div class="modal-content border-primary">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">Editar Movimiento</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                        aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <form id="form-editar-mov">
                         <input type="hidden" id="edit-id-mov">
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label class="form-label">Tipo</label>
-                                <select id="edit-tipo-mov" class="form-select" required>
-                                    <option value="entrada">Entrada</option>
-                                    <option value="salida">Salida</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Fecha</label>
-                                <input type="date" id="edit-fecha-mov" class="form-control" required>
-                            </div>
+                        <div class="mb-3">
+                            <label class="fw-bold">Tipo de Movimiento</label>
+                            <select id="edit-tipo-mov" class="form-select border-primary" required>
+                                <option value="entrada">Entrada (Ingreso)</option>
+                                <option value="salida">Salida (Gasto)</option>
+                            </select>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Concepto</label>
+                            <label class="fw-bold">Fecha</label>
+                            <input type="date" id="edit-fecha-mov" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="fw-bold">Concepto / Descripción</label>
                             <input type="text" id="edit-desc-mov" class="form-control" required>
                         </div>
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label class="form-label">Método Pago</label>
-                                <select id="edit-metodo-mov" class="form-select">
-                                    <option value="Efectivo">Efectivo</option>
-                                    <option value="Sinpe Móvil">Sinpe Móvil</option>
-                                    <option value="Transferencia">Transferencia</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Monto (₡)</label>
-                                <input type="number" id="edit-monto-mov" class="form-control" required min="1"
-                                    step="0.01">
-                            </div>
+                        <div class="mb-3">
+                            <label class="fw-bold">Entidad / Cliente (Opcional)</label>
+                            <input type="text" id="edit-ent-mov" class="form-control">
                         </div>
-                        <button type="submit" class="btn btn-warning w-100 fw-bold shadow-sm">Actualizar</button>
+                        <div class="mb-3">
+                            <label class="fw-bold">Método de Pago</label>
+                            <select id="edit-metodo-mov" class="form-select">
+                                <option value="Efectivo">Efectivo</option>
+                                <option value="Sinpe Móvil">Sinpe Móvil</option>
+                                <option value="Transferencia">Transferencia</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="fw-bold">Monto (₡)</label>
+                            <input type="number" id="edit-monto-mov" class="form-control border-primary" required>
+                        </div>
+                        <div class="text-end mt-4">
+                            <button type="submit" class="btn btn-primary w-100">Guardar Cambios</button>
+                        </div>
                     </form>
                 </div>
             </div>
