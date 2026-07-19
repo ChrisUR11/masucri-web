@@ -395,7 +395,7 @@ window.entregarPedido = async (id) => {
             <div class="mb-3 text-start">
                 <label class="fw-bold">Monto pagado hoy (Total a cobrar: ₡${precioTotal.toLocaleString('es-CR')})</label>
                 <input id="swal-monto" type="number" class="form-control border-primary mt-1" value="${precioTotal}">
-                <small class="text-muted">Puedes cambiar el monto si el cliente solo deja un adelanto.</small>
+                <small class="text-muted">Si el pago queda pendiente, ingresa 0.</small>
             </div>
             <div class="mb-3 text-start">
                 <label class="fw-bold">Método de Pago</label>
@@ -411,10 +411,13 @@ window.entregarPedido = async (id) => {
         confirmButtonColor: '#198754',
         cancelButtonText: 'Cerrar',
         preConfirm: () => {
-            const montoIngresado = parseFloat(document.getElementById('swal-monto').value);
+            const montoInput = document.getElementById('swal-monto').value;
+            const montoIngresado = parseFloat(montoInput);
             const metodoSeleccionado = document.getElementById('swal-metodo').value;
-            if (!montoIngresado || montoIngresado < 0) {
-                Swal.showValidationMessage('Ingrese un monto de pago válido');
+
+            // Permitimos el 0 para marcar como entregado con saldo pendiente completo
+            if (montoInput === '' || isNaN(montoIngresado) || montoIngresado < 0) {
+                Swal.showValidationMessage('Ingrese un monto válido (puede ser 0)');
                 return false;
             }
             return { monto: montoIngresado, metodo: metodoSeleccionado };
@@ -430,7 +433,8 @@ window.entregarPedido = async (id) => {
             await updateDoc(doc(db, "pedidos", id), {
                 estado: 'Entregado',
                 monto_pagado: montoCobrado,
-                fecha_cierre: fechaHoy
+                fecha_cierre: fechaHoy,
+                ultimo_metodo_pago: metodoPago // Guardamos para el historial
             });
 
             if (montoCobrado > 0) {
@@ -523,7 +527,10 @@ window.abonarPedido = async (id) => {
         const saldoRestante = ped.precio - totalPagadoAcumulado;
 
         try {
-            await updateDoc(doc(db, "pedidos", id), { monto_pagado: totalPagadoAcumulado });
+            await updateDoc(doc(db, "pedidos", id), {
+                monto_pagado: totalPagadoAcumulado,
+                ultimo_metodo_pago: metodoPago // Guardamos para el historial
+            });
 
             await addDoc(collection(db, "movimientos"), {
                 tipo: 'entrada',
@@ -651,7 +658,7 @@ window.reimprimirTicket = (id) => {
         pagado,
         Math.max(0, saldoRestante),
         textoEstado,
-        "Estado Actualizado"
+        ped.ultimo_metodo_pago || "Varios / Historial" // Ahora lee el último método de pago guardado
     );
 };
 
@@ -766,7 +773,6 @@ window.editarMov = (id) => {
     const mov = listaMovimientos.find(m => m.id === id);
     if (!mov) return;
 
-    // Se asignan valores de forma defensiva para evitar fallos si el HTML está incompleto
     const setVal = (idEl, val) => { const el = document.getElementById(idEl); if (el) el.value = val; };
 
     setVal('edit-id-mov', mov.id);
@@ -788,7 +794,6 @@ document.getElementById('form-editar-mov').addEventListener('submit', async (e) 
     e.preventDefault();
     const id = document.getElementById('edit-id-mov').value;
 
-    // Función segura para leer datos del HTML
     const getVal = (idEl, defaultVal) => { const el = document.getElementById(idEl); return el ? el.value : defaultVal; };
 
     try {
