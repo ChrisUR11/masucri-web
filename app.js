@@ -6,7 +6,7 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signO
 import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
 // ==========================================
-// 2. CONFIGURACIÓN Y SEGURIDAD
+// 2. CONFIGURACIÓN Y ESTADO GLOBAL
 // ==========================================
 const firebaseConfig = {
     apiKey: "AIzaSyD_p1cLfHMoSugrfPrCJPuHJKEMIH7AvV8",
@@ -21,985 +21,562 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-const CORREOS_PERMITIDOS = [
-    "ulloarodriguezchris@gmail.com",
-    "anisrmj5@gmail.com"
-];
+const CORREOS_PERMITIDOS = ["ulloarodriguezchris@gmail.com", "anisrmj5@gmail.com"];
 
-// Variables Globales
-let listaMovimientos = [];
-let listaPedidos = [];
-let datosParaExportar = [];
-let graficoInstancia = null;
-let graficoEstacionalidad = null;
-let modalPedidoInstancia = null;
-let modalEditarMovInstancia = null;
+// El Estado Global centraliza las listas para que todas las clases puedan leerlas
+const Estado = {
+    movimientos: [],
+    pedidos: [],
+    datosParaExportar: [],
+    modales: { pedido: null, editarMov: null }
+};
 
 // ==========================================
-// UTILIDADES
+// CLASE 1: UTILIDADES Y TICKETS
 // ==========================================
-function obtenerFechaLocal() {
-    const hoy = new Date();
-    const tzOffset = hoy.getTimezoneOffset() * 60000;
-    return new Date(hoy.getTime() - tzOffset).toISOString().split('T')[0];
+class Utils {
+    static obtenerFechaLocal() {
+        const hoy = new Date();
+        const tzOffset = hoy.getTimezoneOffset() * 60000;
+        return new Date(hoy.getTime() - tzOffset).toISOString().split('T')[0];
+    }
 }
 
-async function generarTicket(ticketId, cliente, producto, precioTotal, deudaAnterior, abono, nuevoSaldo, estado, metodo) {
-    const elConsecutivo = document.getElementById('tkt-consecutivo');
-    if (elConsecutivo) elConsecutivo.textContent = ticketId;
+class TicketSystem {
+    static async generar(ticketId, cliente, producto, precioTotal, deudaAnterior, abono, nuevoSaldo, estado, metodo) {
+        const elConsecutivo = document.getElementById('tkt-consecutivo');
+        if (elConsecutivo) elConsecutivo.textContent = ticketId;
 
-    document.getElementById('tkt-fecha').textContent = obtenerFechaLocal();
-    document.getElementById('tkt-cliente').textContent = cliente;
-    // Solo mostramos el producto, ocultando las descripciones/apuntes personales
-    document.getElementById('tkt-producto').textContent = producto;
-    document.getElementById('tkt-precio-total').textContent = `₡${precioTotal.toLocaleString('es-CR')}`;
-    document.getElementById('tkt-anterior').textContent = `₡${deudaAnterior.toLocaleString('es-CR')}`;
-    document.getElementById('tkt-abono').textContent = `₡${abono.toLocaleString('es-CR')}`;
-    document.getElementById('tkt-metodo').textContent = metodo;
-    document.getElementById('tkt-saldo').textContent = `₡${nuevoSaldo.toLocaleString('es-CR')}`;
+        document.getElementById('tkt-fecha').textContent = Utils.obtenerFechaLocal();
+        document.getElementById('tkt-cliente').textContent = cliente;
+        document.getElementById('tkt-producto').textContent = producto;
+        document.getElementById('tkt-precio-total').textContent = `₡${precioTotal.toLocaleString('es-CR')}`;
+        document.getElementById('tkt-anterior').textContent = `₡${deudaAnterior.toLocaleString('es-CR')}`;
+        document.getElementById('tkt-abono').textContent = `₡${abono.toLocaleString('es-CR')}`;
+        document.getElementById('tkt-metodo').textContent = metodo;
+        document.getElementById('tkt-saldo').textContent = `₡${nuevoSaldo.toLocaleString('es-CR')}`;
 
-    const divEstado = document.getElementById('tkt-estado');
-    divEstado.textContent = estado;
+        const divEstado = document.getElementById('tkt-estado');
+        divEstado.textContent = estado;
+        divEstado.style.background = nuevoSaldo === 0 ? '#198754' : '#ffc107';
+        divEstado.style.color = nuevoSaldo === 0 ? '#ffffff' : '#000000';
 
-    if (nuevoSaldo === 0) {
-        divEstado.style.background = '#198754';
-        divEstado.style.color = '#ffffff';
-    } else {
-        divEstado.style.background = '#ffc107';
-        divEstado.style.color = '#000000';
-    }
+        try {
+            const canvas = await html2canvas(document.getElementById('ticket-template'), { scale: 2, backgroundColor: '#ffffff' });
+            canvas.toBlob(async (blob) => {
+                const file = new File([blob], `Ticket_${cliente.replace(/\s+/g, '_')}.png`, { type: 'image/png' });
 
-    const tktElement = document.getElementById('ticket-template');
-
-    try {
-        const canvas = await html2canvas(tktElement, {
-            scale: 2,
-            backgroundColor: '#ffffff'
-        });
-
-        // Convertir la imagen a un Blob para poder compartirla nativamente
-        canvas.toBlob(async (blob) => {
-            const file = new File([blob], `Ticket_${cliente.replace(/\s+/g, '_')}.png`, { type: 'image/png' });
-
-            // Verificar si el teléfono/navegador soporta compartir archivos directamente
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                try {
-                    await navigator.share({
-                        files: [file],
-                        title: 'Comprobante MASUCRI',
-                    });
-                } catch (err) {
-                    console.log("Se canceló el menú de compartir:", err);
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    try {
+                        // WhatsApp en blanco, solo adjunta la imagen
+                        await navigator.share({ files: [file], title: 'Comprobante MASUCRI' });
+                    } catch (err) { console.log("Compartir cancelado"); }
+                } else {
+                    const link = document.createElement('a'); link.download = file.name; link.href = URL.createObjectURL(blob); link.click();
+                    const r = await Swal.fire({ title: 'Imagen Descargada', text: 'Tu navegador no soporta envío directo.', icon: 'info', confirmButtonText: 'Abrir WhatsApp Web', showCancelButton: true });
+                    if (r.isConfirmed) window.open('https://web.whatsapp.com/', '_blank');
                 }
-            } else {
-                // FALLBACK: Si es una compu vieja que no soporta compartir, lo descarga y ofrece abrir WhatsApp Web
-                const link = document.createElement('a');
-                link.download = file.name;
-                link.href = URL.createObjectURL(blob);
-                link.click();
+            }, 'image/png');
+        } catch (error) { Swal.fire('Error', 'No se pudo generar el recibo.', 'error'); }
+    }
+}
 
-                Swal.fire({
-                    title: 'Imagen Descargada',
-                    text: 'Tu navegador no soporta envío directo. La imagen se descargó para que la adjuntes en WhatsApp Web.',
-                    icon: 'info',
-                    confirmButtonText: 'Abrir WhatsApp Web',
-                    showCancelButton: true,
-                    cancelButtonText: 'Cerrar'
-                }).then((r) => {
-                    if (r.isConfirmed) {
-                        window.open('https://web.whatsapp.com/', '_blank');
-                    }
-                });
+// ==========================================
+// CLASE 2: GESTOR DE INTERFAZ Y NAVEGACIÓN
+// ==========================================
+class UIManager {
+    static init() {
+        this.vistas = {
+            pedidos: document.getElementById('vista-pedidos'),
+            historial: document.getElementById('vista-historial'),
+            registro: document.getElementById('vista-registro'),
+            reportes: document.getElementById('vista-reportes'),
+            dashboard: document.getElementById('vista-dashboard')
+        };
+        this.navLinks = {
+            pedidos: document.getElementById('nav-pedidos'), historial: document.getElementById('nav-historial'),
+            registro: document.getElementById('nav-registro'), reportes: document.getElementById('nav-reportes'),
+            dashboard: document.getElementById('nav-dashboard')
+        };
+
+        Object.keys(this.navLinks).forEach(key => {
+            this.navLinks[key].addEventListener('click', (e) => { e.preventDefault(); this.cambiarVista(key); });
+        });
+    }
+
+    static cambiarVista(vistaActiva) {
+        Object.values(this.vistas).forEach(v => v.classList.remove('active'));
+        Object.values(this.navLinks).forEach(n => n.classList.remove('active'));
+
+        this.vistas[vistaActiva].classList.add('active');
+        this.navLinks[vistaActiva].classList.add('active');
+
+        if (vistaActiva === 'reportes') FinanzasSystem.renderizarReporte();
+        if (vistaActiva === 'pedidos') PedidosSystem.renderizarPendientes();
+        if (vistaActiva === 'historial') PedidosSystem.renderizarHistorial();
+        if (vistaActiva === 'dashboard') DashboardSystem.renderizar();
+
+        const navbarCollapse = document.getElementById('navbarNav');
+        if (navbarCollapse.classList.contains('show')) document.querySelector('.navbar-toggler').click();
+    }
+}
+
+// ==========================================
+// CLASE 3: SISTEMA DE PEDIDOS
+// ==========================================
+class PedidosSystem {
+    static init() {
+        onSnapshot(query(collection(db, "pedidos"), orderBy("fecha_entrega", "asc")), (snapshot) => {
+            Estado.pedidos = [];
+            snapshot.forEach(doc => Estado.pedidos.push({ id: doc.id, ...doc.data() }));
+            this.renderizarPendientes();
+            this.renderizarHistorial();
+            if (UIManager.vistas.dashboard.classList.contains('active')) DashboardSystem.renderizar();
+        }, (err) => { if (err.code === 'permission-denied') Swal.fire('Seguridad', 'Las reglas de Firebase bloquearon el acceso.', 'error'); });
+    }
+
+    static renderizarPendientes() {
+        if (!UIManager.vistas.pedidos.classList.contains('active')) return;
+        let pendientes = Estado.pedidos.filter(p => p.estado === 'Pendiente');
+
+        const fTexto = document.getElementById('filtro-pedido-texto').value.toLowerCase();
+        const fSol = document.getElementById('filtro-pedido-solicitud').value;
+        const fEnt = document.getElementById('filtro-pedido-entrega').value;
+
+        if (fTexto) pendientes = pendientes.filter(p => p.cliente.toLowerCase().includes(fTexto) || p.producto.toLowerCase().includes(fTexto));
+        if (fSol) pendientes = pendientes.filter(p => p.fecha_solicitud >= fSol);
+        if (fEnt) pendientes = pendientes.filter(p => p.fecha_entrega && p.fecha_entrega <= fEnt);
+
+        const tbody = document.getElementById('tabla-pedidos');
+        let html = ''; const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+
+        pendientes.forEach(ped => {
+            let bClass = '', txtPrio = '';
+            if (!ped.fecha_entrega) { bClass = 'bg-secondary'; txtPrio = 'Sin Fecha'; }
+            else {
+                const diff = Math.ceil((new Date(ped.fecha_entrega + 'T00:00:00') - hoy) / 86400000);
+                if (diff < 0) { bClass = 'bg-danger'; txtPrio = 'Atrasado'; }
+                else if (diff === 0) { bClass = 'bg-danger'; txtPrio = 'Para Hoy'; }
+                else if (diff <= 2) { bClass = 'bg-warning text-dark'; txtPrio = 'Alta'; }
+                else if (diff <= 5) { bClass = 'bg-info text-dark'; txtPrio = 'Media'; }
+                else { bClass = 'bg-success'; txtPrio = 'Baja'; }
             }
-        }, 'image/png');
-    } catch (error) {
-        console.error("Error generando ticket:", error);
-        Swal.fire('Error', 'No se pudo generar la imagen del recibo.', 'error');
-    }
-}
-
-// ==========================================
-// 3. NAVEGACIÓN Y AUTENTICACIÓN
-// ==========================================
-const vistas = {
-    pedidos: document.getElementById('vista-pedidos'),
-    historial: document.getElementById('vista-historial'),
-    registro: document.getElementById('vista-registro'),
-    reportes: document.getElementById('vista-reportes'),
-    dashboard: document.getElementById('vista-dashboard')
-};
-
-const navLinks = {
-    pedidos: document.getElementById('nav-pedidos'),
-    historial: document.getElementById('nav-historial'),
-    registro: document.getElementById('nav-registro'),
-    reportes: document.getElementById('nav-reportes'),
-    dashboard: document.getElementById('nav-dashboard')
-};
-
-function cambiarVista(vistaActiva) {
-    Object.values(vistas).forEach(v => v.classList.remove('active'));
-    Object.values(navLinks).forEach(n => n.classList.remove('active'));
-
-    vistas[vistaActiva].classList.add('active');
-    navLinks[vistaActiva].classList.add('active');
-
-    if (vistaActiva === 'reportes') generarReporteFinanciero();
-    if (vistaActiva === 'pedidos') renderizarPedidos();
-    if (vistaActiva === 'historial') renderizarHistorialPedidos();
-    if (vistaActiva === 'dashboard') renderizarDashboard();
-
-    const navbarCollapse = document.getElementById('navbarNav');
-    if (navbarCollapse.classList.contains('show')) {
-        document.querySelector('.navbar-toggler').click();
-    }
-}
-
-Object.keys(navLinks).forEach(key => {
-    navLinks[key].addEventListener('click', (e) => {
-        e.preventDefault();
-        cambiarVista(key);
-    });
-});
-
-document.getElementById('btn-login').addEventListener('click', async () => {
-    try {
-        await signInWithPopup(auth, new GoogleAuthProvider());
-    } catch (e) {
-        Swal.fire('Error', 'Hubo un error al iniciar sesión.', 'error');
-    }
-});
-
-document.getElementById('btn-logout').addEventListener('click', async () => {
-    const result = await Swal.fire({ title: '¿Cerrar sesión?', icon: 'warning', showCancelButton: true });
-    if (result.isConfirmed) await signOut(auth);
-});
-
-onAuthStateChanged(auth, async (user) => {
-    if (user && CORREOS_PERMITIDOS.includes(user.email)) {
-        document.getElementById('login-container').classList.add('d-none');
-        document.getElementById('app-container').classList.remove('d-none');
-        document.getElementById('app-container').classList.add('d-flex');
-        document.getElementById('user-info').textContent = `Admin: ${user.displayName}`;
-
-        const elModalPed = document.getElementById('modalPedido');
-        if (elModalPed) modalPedidoInstancia = new bootstrap.Modal(elModalPed);
-
-        const elModalMov = document.getElementById('modalEditarMov');
-        if (elModalMov) modalEditarMovInstancia = new bootstrap.Modal(elModalMov);
-
-        cargarPedidos();
-        cargarFinanzas();
-        cambiarVista('pedidos');
-    } else if (user) {
-        await signOut(auth);
-        Swal.fire({ icon: 'error', title: 'Acceso Denegado', text: 'No tienes permisos para este sistema.' });
-    } else {
-        document.getElementById('login-container').classList.remove('d-none');
-        document.getElementById('app-container').classList.add('d-none');
-        document.getElementById('app-container').classList.remove('d-flex');
-    }
-});
-
-// ==========================================
-// 4. MÓDULO: GESTIÓN DE PEDIDOS
-// ==========================================
-function cargarPedidos() {
-    onSnapshot(query(collection(db, "pedidos"), orderBy("fecha_entrega", "asc")), (snapshot) => {
-        listaPedidos = [];
-        snapshot.forEach(doc => listaPedidos.push({ id: doc.id, ...doc.data() }));
-        renderizarPedidos();
-        renderizarHistorialPedidos();
-        if (vistas.dashboard.classList.contains('active')) renderizarDashboard();
-    }, (error) => {
-        // Manejador de error para reglas de seguridad
-        if (error.code === 'permission-denied') Swal.fire('Seguridad', 'Las reglas de Firebase bloquearon el acceso. Comprueba que seas admin.', 'error');
-    });
-}
-
-window.abrirModalPedido = (id = null) => {
-    const form = document.getElementById('form-pedido');
-    form.reset();
-    document.getElementById('ped-id').value = '';
-    document.getElementById('ped-solicitado').value = obtenerFechaLocal();
-    document.getElementById('tituloModalPedido').textContent = 'Nuevo Pedido';
-
-    if (id) {
-        const ped = listaPedidos.find(p => p.id === id);
-        if (ped) {
-            document.getElementById('tituloModalPedido').textContent = 'Editar Pedido';
-            document.getElementById('ped-id').value = ped.id;
-            document.getElementById('ped-solicitado').value = ped.fecha_solicitud;
-            if (ped.fecha_entrega) document.getElementById('ped-entrega').value = ped.fecha_entrega;
-            document.getElementById('ped-cliente').value = ped.cliente;
-            document.getElementById('ped-producto').value = ped.producto;
-            document.getElementById('ped-desc').value = ped.descripcion || '';
-            document.getElementById('ped-precio').value = ped.precio || '';
-        }
-    }
-    if (modalPedidoInstancia) modalPedidoInstancia.show();
-};
-
-document.getElementById('form-pedido').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const id = document.getElementById('ped-id').value;
-
-    const datos = {
-        fecha_solicitud: document.getElementById('ped-solicitado').value,
-        fecha_entrega: document.getElementById('ped-entrega').value,
-        cliente: document.getElementById('ped-cliente').value.trim(),
-        producto: document.getElementById('ped-producto').value.trim(),
-        descripcion: document.getElementById('ped-desc').value.trim(),
-        precio: parseFloat(document.getElementById('ped-precio').value) || 0,
-    };
-
-    if (datos.fecha_entrega && datos.fecha_entrega < datos.fecha_solicitud) {
-        return Swal.fire('Error', 'La fecha de entrega no puede ser menor a la de solicitud.', 'error');
+            const txtPrecio = ped.precio > 0 ? `₡${ped.precio.toLocaleString('es-CR')}` : '<span class="text-warning">Pendiente</span>';
+            html += `<tr><td><span class="badge ${bClass} w-100 py-2">${txtPrio}</span></td><td class="small"><span class="text-muted d-block">Sol: ${ped.fecha_solicitud}</span><strong class="text-dark d-block">Ent: ${ped.fecha_entrega || 'Pendiente'}</strong></td><td class="fw-bold">${ped.cliente}</td><td>${ped.producto} <br><small class="text-muted">${ped.descripcion || ''}</small></td><td class="fw-bold">${txtPrecio}</td><td class="text-center align-middle"><div class="d-flex justify-content-center gap-1"><button class="btn btn-sm btn-outline-success" onclick="PedidosSystem.entregar('${ped.id}')">Entregar</button><button class="btn btn-sm btn-outline-secondary" onclick="PedidosSystem.abrirModal('${ped.id}')">Editar</button><button class="btn btn-sm btn-outline-danger" onclick="PedidosSystem.cancelar('${ped.id}')">Anular</button></div></td></tr>`;
+        });
+        tbody.innerHTML = html || '<tr><td colspan="6" class="text-center py-4">No hay pedidos pendientes.</td></tr>';
     }
 
-    const btnSubmit = e.target.querySelector('button');
-    btnSubmit.disabled = true;
+    static renderizarHistorial() {
+        if (!UIManager.vistas.historial.classList.contains('active')) return;
+        let historial = Estado.pedidos.filter(p => p.estado !== 'Pendiente').sort((a, b) => new Date(b.fecha_cierre) - new Date(a.fecha_cierre));
+        const filtro = document.getElementById('filtro-historial').value;
 
-    try {
+        if (filtro === 'con_saldo') historial = historial.filter(p => p.estado === 'Entregado' && (p.precio - (p.monto_pagado || 0)) > 0);
+        else if (filtro === 'entregados') historial = historial.filter(p => p.estado === 'Entregado' && (p.precio - (p.monto_pagado || 0)) <= 0);
+        else if (filtro === 'anulados') historial = historial.filter(p => p.estado === 'Cancelado');
+
+        const tbody = document.getElementById('tabla-historial'); let html = '';
+        historial.forEach(ped => {
+            let bColor = ped.estado === 'Entregado' ? 'bg-success' : 'bg-danger';
+            let txtEst = ped.estado; const deuda = (ped.precio || 0) - (ped.monto_pagado || 0);
+            let txtPago = `Pagado: ₡${(ped.monto_pagado || 0).toLocaleString('es-CR')}`;
+            let btns = `<button class="btn btn-sm btn-outline-info" onclick="PedidosSystem.reimprimir('${ped.id}')">Enviar Ticket</button>`;
+
+            if (ped.estado === 'Entregado') {
+                if (deuda > 0) {
+                    bColor = 'bg-warning text-dark'; txtEst = 'Con Saldo';
+                    txtPago += `<br><small class="text-danger fw-bold">Debe: ₡${deuda.toLocaleString('es-CR')}</small>`;
+                    btns += `<button class="btn btn-sm btn-success" onclick="PedidosSystem.abonar('${ped.id}')">Abonar</button>`;
+                } else if (deuda < 0) {
+                    textoPago += `<br><small class="text-success fw-bold">+ Propina: ₡${Math.abs(deuda).toLocaleString('es-CR')}</small>`;
+                }
+            }
+            html += `<tr><td><span class="badge ${bColor}">${txtEst}</span></td><td>${ped.fecha_cierre}</td><td class="fw-bold">${ped.cliente}</td><td>${ped.producto}</td><td>${ped.estado === 'Cancelado' ? '-' : txtPago}</td><td class="text-center align-middle"><div class="d-flex justify-content-center gap-2">${btns}<button class="btn btn-sm btn-outline-danger" onclick="PedidosSystem.borrarHistorial('${ped.id}')">Eliminar</button></div></td></tr>`;
+        });
+        tbody.innerHTML = html || `<tr><td colspan="6" class="text-center py-4 text-muted">No hay registros con la opción seleccionada.</td></tr>`;
+    }
+
+    static abrirModal(id = null) {
+        document.getElementById('form-pedido').reset(); document.getElementById('ped-id').value = '';
+        document.getElementById('ped-solicitado').value = Utils.obtenerFechaLocal(); document.getElementById('tituloModalPedido').textContent = 'Nuevo Pedido';
         if (id) {
-            await updateDoc(doc(db, "pedidos", id), datos);
-        } else {
-            datos.estado = 'Pendiente';
-            datos.monto_pagado = 0;
-            datos.timestamp = new Date();
-            await addDoc(collection(db, "pedidos"), datos);
+            const p = Estado.pedidos.find(x => x.id === id);
+            if (p) {
+                document.getElementById('tituloModalPedido').textContent = 'Editar Pedido'; document.getElementById('ped-id').value = p.id;
+                document.getElementById('ped-solicitado').value = p.fecha_solicitud; if (p.fecha_entrega) document.getElementById('ped-entrega').value = p.fecha_entrega;
+                document.getElementById('ped-cliente').value = p.cliente; document.getElementById('ped-producto').value = p.producto;
+                document.getElementById('ped-desc').value = p.descripcion || ''; document.getElementById('ped-precio').value = p.precio || '';
+            }
         }
-        if (modalPedidoInstancia) modalPedidoInstancia.hide();
-        Swal.fire({ icon: 'success', title: 'Guardado correctamente', timer: 1000, showConfirmButton: false });
-    } catch (e) {
-        Swal.fire('Error', 'No se pudo guardar el pedido.', 'error');
-    } finally {
-        btnSubmit.disabled = false;
+        if (Estado.modales.pedido) Estado.modales.pedido.show();
     }
-});
 
-function renderizarPedidos() {
-    if (!vistas.pedidos.classList.contains('active')) return;
-    let pendientes = listaPedidos.filter(p => p.estado === 'Pendiente');
+    static async guardar(e) {
+        e.preventDefault(); const id = document.getElementById('ped-id').value;
+        const datos = {
+            fecha_solicitud: document.getElementById('ped-solicitado').value, fecha_entrega: document.getElementById('ped-entrega').value,
+            cliente: document.getElementById('ped-cliente').value.trim(), producto: document.getElementById('ped-producto').value.trim(),
+            descripcion: document.getElementById('ped-desc').value.trim(), precio: parseFloat(document.getElementById('ped-precio').value) || 0
+        };
+        if (datos.fecha_entrega && datos.fecha_entrega < datos.fecha_solicitud) return Swal.fire('Error', 'La fecha de entrega no puede ser menor a la de solicitud.', 'error');
+        const btn = e.target.querySelector('button'); btn.disabled = true;
+        try {
+            if (id) await updateDoc(doc(db, "pedidos", id), datos);
+            else { datos.estado = 'Pendiente'; datos.monto_pagado = 0; datos.timestamp = new Date(); await addDoc(collection(db, "pedidos"), datos); }
+            if (Estado.modales.pedido) Estado.modales.pedido.hide();
+            Swal.fire({ icon: 'success', title: 'Guardado correctamente', timer: 1000, showConfirmButton: false });
+        } catch (error) { Swal.fire('Error', 'No se pudo guardar.', 'error'); } finally { btn.disabled = false; }
+    }
 
-    const txtFiltro = document.getElementById('filtro-pedido-texto').value.toLowerCase();
-    const fechaSolFiltro = document.getElementById('filtro-pedido-solicitud').value;
-    const fechaEntFiltro = document.getElementById('filtro-pedido-entrega').value;
-
-    if (txtFiltro) pendientes = pendientes.filter(p => p.cliente.toLowerCase().includes(txtFiltro) || p.producto.toLowerCase().includes(txtFiltro));
-    if (fechaSolFiltro) pendientes = pendientes.filter(p => p.fecha_solicitud >= fechaSolFiltro);
-    if (fechaEntFiltro) pendientes = pendientes.filter(p => p.fecha_entrega && p.fecha_entrega <= fechaEntFiltro);
-
-    const tbody = document.getElementById('tabla-pedidos');
-    let html = '';
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
-
-    pendientes.forEach(ped => {
-        let badgeClass = '';
-        let textoPrioridad = '';
-
-        if (!ped.fecha_entrega) {
-            badgeClass = 'bg-secondary';
-            textoPrioridad = 'Sin Fecha';
-        } else {
-            const fechaEntregaObj = new Date(ped.fecha_entrega + 'T00:00:00');
-            const diffDias = Math.ceil((fechaEntregaObj - hoy) / (1000 * 60 * 60 * 24));
-
-            if (diffDias < 0) { badgeClass = 'bg-danger'; textoPrioridad = 'Atrasado'; }
-            else if (diffDias === 0) { badgeClass = 'bg-danger'; textoPrioridad = 'Para Hoy'; }
-            else if (diffDias <= 2) { badgeClass = 'bg-warning text-dark'; textoPrioridad = 'Alta'; }
-            else if (diffDias <= 5) { badgeClass = 'bg-info text-dark'; textoPrioridad = 'Media'; }
-            else { badgeClass = 'bg-success'; textoPrioridad = 'Baja'; }
+    static async entregar(id) {
+        const ped = Estado.pedidos.find(p => p.id === id); if (!ped) return;
+        let pTot = ped.precio;
+        if (!pTot || pTot === 0) {
+            const { value: nP } = await Swal.fire({ title: 'Fijar Precio Final', input: 'number', showCancelButton: true, inputValidator: v => (!v || v <= 0) ? 'Ingrese monto mayor a 0' : null });
+            if (!nP) return; pTot = parseFloat(nP); await updateDoc(doc(db, "pedidos", id), { precio: pTot }); ped.precio = pTot;
         }
+        const r = await Swal.fire({
+            title: 'Entregar y Cobrar',
+            html: `<div class="text-start mb-2"><label class="fw-bold">Pagado hoy (Total: ₡${pTot})</label><input id="swal-monto" type="number" class="form-control border-primary" value="${pTot}"><small class="text-muted">Si el pago queda pendiente, ingresa 0.</small></div>
+                   <div class="text-start"><label class="fw-bold">Método de Pago</label><select id="swal-metodo" class="form-select border-primary"><option>Efectivo</option><option>Sinpe Móvil</option><option>Transferencia</option></select></div>`,
+            showCancelButton: true, confirmButtonText: 'Registrar', confirmButtonColor: '#198754',
+            preConfirm: () => {
+                const crudo = document.getElementById('swal-monto').value;
+                const m = parseFloat(crudo);
+                if (crudo === '' || isNaN(m) || m < 0) { Swal.showValidationMessage('Ingrese un monto válido (puede ser 0)'); return false; }
+                return { monto: m, metodo: document.getElementById('swal-metodo').value };
+            }
+        });
+        if (r.isConfirmed) {
+            const cobrado = r.value.monto, metodo = r.value.metodo, hoy = Utils.obtenerFechaLocal();
+            try {
+                await updateDoc(doc(db, "pedidos", id), { estado: 'Entregado', monto_pagado: cobrado, fecha_cierre: hoy, ultimo_metodo_pago: metodo });
+                if (cobrado > 0) FinanzasSystem.registrarDesdePedido(metodo, hoy, `Pago de pedido: ${ped.producto}`, ped.cliente, cobrado);
+                const saldo = pTot - cobrado;
+                if ((await Swal.fire({ title: 'Éxito', text: '¿Enviar ticket?', icon: 'success', showCancelButton: true })).isConfirmed) {
+                    TicketSystem.generar(ped.id.slice(-5).toUpperCase(), ped.cliente, ped.producto, pTot, pTot, cobrado, Math.max(0, saldo), saldo <= 0 ? 'CANCELADO' : 'SALDO PENDIENTE', metodo);
+                }
+            } catch (e) { Swal.fire('Error', 'Ocurrió un problema guardando en la base de datos.', 'error'); }
+        }
+    }
 
-        const textoPrecio = ped.precio > 0 ? `₡${ped.precio.toLocaleString('es-CR')}` : '<span class="text-warning">Pendiente</span>';
+    static async abonar(id) {
+        const ped = Estado.pedidos.find(p => p.id === id); if (!ped) return;
+        const dAnt = ped.precio - (ped.monto_pagado || 0);
+        const r = await Swal.fire({
+            title: 'Nuevo Abono',
+            html: `<div class="text-start mb-2"><label class="fw-bold">Deuda Actual: ₡${dAnt}</label><input id="swal-monto" type="number" class="form-control border-success"></div>
+            <div class="text-start"><label class="fw-bold">Método</label><select id="swal-metodo" class="form-select"><option>Efectivo</option><option>Sinpe Móvil</option><option>Transferencia</option></select></div>`,
+            showCancelButton: true, confirmButtonText: 'Guardar', preConfirm: () => {
+                const m = parseFloat(document.getElementById('swal-monto').value);
+                if (!m || m <= 0) { Swal.showValidationMessage('Ingrese un monto mayor a 0'); return false; }
+                return { m, met: document.getElementById('swal-metodo').value };
+            }
+        });
+        if (r.isConfirmed) {
+            const { m, met } = r.value; const nPagado = (ped.monto_pagado || 0) + m; const saldo = ped.precio - nPagado;
+            try {
+                await updateDoc(doc(db, "pedidos", id), { monto_pagado: nPagado, ultimo_metodo_pago: met });
+                FinanzasSystem.registrarDesdePedido(met, Utils.obtenerFechaLocal(), `Abono a deuda: ${ped.producto}`, ped.cliente, m);
+                if ((await Swal.fire({ title: 'Abono registrado', icon: 'success', showCancelButton: true, confirmButtonText: 'Ticket' })).isConfirmed) {
+                    TicketSystem.generar(ped.id.slice(-5).toUpperCase(), ped.cliente, ped.producto, ped.precio, dAnt, m, Math.max(0, saldo), saldo <= 0 ? 'CANCELADO' : 'ABONO', met);
+                }
+            } catch (e) { Swal.fire('Error', 'No se pudo guardar el abono.', 'error'); }
+        }
+    }
 
-        html += `
-            <tr>
-                <td><span class="badge ${badgeClass} w-100 py-2">${textoPrioridad}</span></td>
-                <td class="small">
-                    <span class="text-muted d-block">Sol: ${ped.fecha_solicitud}</span>
-                    <strong class="text-dark d-block">Ent: ${ped.fecha_entrega || 'Pendiente'}</strong>
-                </td>
-                <td class="fw-bold">${ped.cliente}</td>
-                <td>${ped.producto} <br><small class="text-muted">${ped.descripcion || ''}</small></td>
-                <td class="fw-bold">${textoPrecio}</td>
-                <td class="text-center align-middle">
-                    <div class="d-flex justify-content-center gap-1">
-                        <button class="btn btn-sm btn-outline-success" onclick="window.entregarPedido('${ped.id}')">Entregar</button>
-                        <button class="btn btn-sm btn-outline-secondary" onclick="window.abrirModalPedido('${ped.id}')">Editar</button>
-                        <button class="btn btn-sm btn-outline-danger" onclick="window.cancelarPedido('${ped.id}')">Anular</button>
-                    </div>
-                </td>
-            </tr>
-        `;
-    });
-    tbody.innerHTML = html || '<tr><td colspan="6" class="text-center py-4 text-muted">No hay pedidos pendientes en este momento.</td></tr>';
+    static async cancelar(id) {
+        if ((await Swal.fire({ title: '¿Anular este pedido?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545' })).isConfirmed) {
+            await updateDoc(doc(db, "pedidos", id), { estado: 'Cancelado', fecha_cierre: Utils.obtenerFechaLocal() });
+        }
+    }
+
+    static reimprimir(id) {
+        const p = Estado.pedidos.find(x => x.id === id); if (!p) return;
+        const pTot = p.precio || 0, pag = p.monto_pagado || 0, sal = pTot - pag;
+        TicketSystem.generar(p.id.slice(-5).toUpperCase(), p.cliente, p.producto, pTot, pTot, pag, Math.max(0, sal), sal <= 0 ? 'CANCELADO' : 'SALDO PENDIENTE', p.ultimo_metodo_pago || 'Historial');
+    }
+
+    static async borrarHistorial(id) {
+        if ((await Swal.fire({ title: '¿Borrar definitivo?', text: 'Se borrará el registro de pedidos (finanzas queda intacto).', icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33' })).isConfirmed) await deleteDoc(doc(db, "pedidos", id));
+    }
 }
 
-['filtro-pedido-texto', 'filtro-pedido-solicitud', 'filtro-pedido-entrega'].forEach(id => {
-    document.getElementById(id).addEventListener('input', renderizarPedidos);
-});
-
-document.getElementById('btn-limpiar-pedidos').addEventListener('click', () => {
-    document.getElementById('filtro-pedido-texto').value = '';
-    document.getElementById('filtro-pedido-solicitud').value = '';
-    document.getElementById('filtro-pedido-entrega').value = '';
-    renderizarPedidos();
-});
-
-window.cancelarPedido = async (id) => {
-    const result = await Swal.fire({
-        title: '¿Anular este pedido?',
-        text: 'Pasará al historial como un trabajo anulado o cancelado por el cliente.',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonText: 'Sí, anular',
-        confirmButtonColor: '#dc3545'
-    });
-
-    if (result.isConfirmed) {
-        await updateDoc(doc(db, "pedidos", id), { estado: 'Cancelado', fecha_cierre: obtenerFechaLocal() });
-    }
-};
-
 // ==========================================
-// 5. FLUJO DE PAGO Y GENERACIÓN DE TICKET
+// CLASE 4: SISTEMA DE FINANZAS
 // ==========================================
-window.entregarPedido = async (id) => {
-    const ped = listaPedidos.find(p => p.id === id);
-    if (!ped) return;
-
-    let precioTotal = ped.precio;
-
-    if (!precioTotal || precioTotal === 0) {
-        const { value: nuevoPrecioStr } = await Swal.fire({
-            title: 'Fijar Precio Final',
-            input: 'number',
-            text: 'Este pedido no tenía un precio definido. Ingresa el total:',
-            showCancelButton: true,
-            inputValidator: (v) => { if (!v || v <= 0) return 'Debe ingresar un monto mayor a 0'; }
+class FinanzasSystem {
+    static init() {
+        document.getElementById('fecha-mov').value = Utils.obtenerFechaLocal();
+        onSnapshot(query(collection(db, "movimientos"), orderBy("fecha", "desc")), (snapshot) => {
+            Estado.movimientos = []; snapshot.forEach(doc => Estado.movimientos.push({ id: doc.id, ...doc.data() }));
+            if (UIManager.vistas.reportes.classList.contains('active')) this.renderizarReporte();
+            if (UIManager.vistas.dashboard.classList.contains('active')) DashboardSystem.renderizar();
         });
-
-        if (!nuevoPrecioStr) return;
-
-        precioTotal = parseFloat(nuevoPrecioStr);
-        await updateDoc(doc(db, "pedidos", id), { precio: precioTotal });
-        ped.precio = precioTotal;
     }
 
-    const result = await Swal.fire({
-        title: 'Entregar Trabajo y Cobrar',
-        html: `
-            <div class="mb-3 text-start">
-                <label class="fw-bold">Monto pagado hoy (Total a cobrar: ₡${precioTotal.toLocaleString('es-CR')})</label>
-                <input id="swal-monto" type="number" class="form-control border-primary mt-1" value="${precioTotal}">
-                <small class="text-muted">Si el pago queda pendiente, ingresa 0.</small>
-            </div>
-            <div class="mb-3 text-start">
-                <label class="fw-bold">Método de Pago</label>
-                <select id="swal-metodo" class="form-select border-primary mt-1">
-                    <option value="Efectivo">Efectivo</option>
-                    <option value="Sinpe Móvil">Sinpe Móvil</option>
-                    <option value="Transferencia">Transferencia</option>
-                </select>
-            </div>
-        `,
-        showCancelButton: true,
-        confirmButtonText: 'Registrar y Guardar',
-        confirmButtonColor: '#198754',
-        cancelButtonText: 'Cerrar',
-        preConfirm: () => {
-            const montoInput = document.getElementById('swal-monto').value;
-            const montoIngresado = parseFloat(montoInput);
-            const metodoSeleccionado = document.getElementById('swal-metodo').value;
-
-            // Permitimos el 0 para marcar como entregado con saldo pendiente completo
-            if (montoInput === '' || isNaN(montoIngresado) || montoIngresado < 0) {
-                Swal.showValidationMessage('Ingrese un monto válido (puede ser 0)');
-                return false;
-            }
-            return { monto: montoIngresado, metodo: metodoSeleccionado };
-        }
-    });
-
-    if (result.isConfirmed) {
-        const montoCobrado = result.value.monto;
-        const metodoPago = result.value.metodo;
-        const fechaHoy = obtenerFechaLocal();
-
+    static async registrarManual(e) {
+        e.preventDefault(); const btn = e.target.querySelector('button'); btn.disabled = true;
         try {
-            await updateDoc(doc(db, "pedidos", id), {
-                estado: 'Entregado',
-                monto_pagado: montoCobrado,
-                fecha_cierre: fechaHoy,
-                ultimo_metodo_pago: metodoPago // Guardamos para el historial
-            });
-
-            if (montoCobrado > 0) {
-                await addDoc(collection(db, "movimientos"), {
-                    tipo: 'entrada',
-                    metodo_pago: metodoPago,
-                    fecha: fechaHoy,
-                    descripcion: `Pago de pedido: ${ped.producto}`,
-                    entidad: ped.cliente,
-                    monto: montoCobrado,
-                    timestamp: new Date()
-                });
-            }
-
-            const saldoRestante = precioTotal - montoCobrado;
-            let textoEstado = '';
-            if (saldoRestante <= 0) {
-                textoEstado = 'CANCELADO EN SU TOTALIDAD';
-            } else {
-                textoEstado = 'ABONO REGISTRADO - QUEDA SALDO';
-            }
-
-            Swal.fire({
-                title: 'Operación Exitosa',
-                text: '¿Deseas compartir el recibo con el cliente?',
-                icon: 'success',
-                showCancelButton: true,
-                confirmButtonText: 'Sí, enviar ticket',
-                cancelButtonText: 'No, terminar'
-            }).then((resDescarga) => {
-                if (resDescarga.isConfirmed) {
-                    generarTicket(
-                        ped.id.slice(-5).toUpperCase(), // Ticket ID 
-                        ped.cliente,
-                        ped.producto,
-                        precioTotal,
-                        precioTotal,
-                        montoCobrado,
-                        Math.max(0, saldoRestante),
-                        textoEstado,
-                        metodoPago
-                    );
-                }
-            });
-        } catch (e) {
-            Swal.fire('Error', 'Ocurrió un problema guardando en la base de datos.', 'error');
-        }
-    }
-};
-
-window.abonarPedido = async (id) => {
-    const ped = listaPedidos.find(p => p.id === id);
-    if (!ped) return;
-
-    const deudaAnterior = ped.precio - (ped.monto_pagado || 0);
-
-    const result = await Swal.fire({
-        title: 'Ingresar Nuevo Abono',
-        html: `
-            <div class="mb-3 text-start">
-                <label class="fw-bold">Deuda Actual: ₡${deudaAnterior.toLocaleString('es-CR')}</label>
-                <input id="swal-monto" type="number" class="form-control border-success mt-1" placeholder="¿Cuánto dinero abona hoy?">
-            </div>
-            <div class="mb-3 text-start">
-                <label class="fw-bold">Método de Pago</label>
-                <select id="swal-metodo" class="form-select mt-1">
-                    <option value="Efectivo">Efectivo</option>
-                    <option value="Sinpe Móvil">Sinpe Móvil</option>
-                    <option value="Transferencia">Transferencia</option>
-                </select>
-            </div>
-        `,
-        showCancelButton: true,
-        confirmButtonText: 'Guardar Abono',
-        preConfirm: () => {
-            const montoAbono = parseFloat(document.getElementById('swal-monto').value);
-            const metodoSeleccionado = document.getElementById('swal-metodo').value;
-            if (!montoAbono || montoAbono <= 0) {
-                Swal.showValidationMessage('Ingrese un monto válido mayor a 0');
-                return false;
-            }
-            return { monto: montoAbono, metodo: metodoSeleccionado };
-        }
-    });
-
-    if (result.isConfirmed) {
-        const montoAbonado = result.value.monto;
-        const metodoPago = result.value.metodo;
-        const totalPagadoAcumulado = (ped.monto_pagado || 0) + montoAbonado;
-        const saldoRestante = ped.precio - totalPagadoAcumulado;
-
-        try {
-            await updateDoc(doc(db, "pedidos", id), {
-                monto_pagado: totalPagadoAcumulado,
-                ultimo_metodo_pago: metodoPago // Guardamos para el historial
-            });
-
             await addDoc(collection(db, "movimientos"), {
-                tipo: 'entrada',
-                metodo_pago: metodoPago,
-                fecha: obtenerFechaLocal(),
-                descripcion: `Abono a deuda de pedido: ${ped.producto}`,
-                entidad: ped.cliente,
-                monto: montoAbonado,
-                timestamp: new Date()
+                tipo: document.getElementById('tipo').value, fecha: document.getElementById('fecha-mov').value,
+                metodo_pago: document.getElementById('metodo-pago-mov').value, descripcion: document.getElementById('descripcion-mov').value.trim(),
+                entidad: document.getElementById('entidad-mov').value.trim(), monto: parseFloat(document.getElementById('monto-mov').value), timestamp: new Date()
             });
-
-            let textoEstado = '';
-            if (saldoRestante <= 0) {
-                textoEstado = 'CANCELADO EN SU TOTALIDAD';
-            } else {
-                textoEstado = 'ABONO REGISTRADO - QUEDA SALDO';
-            }
-
-            Swal.fire({
-                title: 'Abono registrado',
-                text: '¿Deseas enviar el comprobante del abono al cliente?',
-                icon: 'success',
-                showCancelButton: true,
-                confirmButtonText: 'Sí, enviar ticket',
-                cancelButtonText: 'Cerrar'
-            }).then((resDescarga) => {
-                if (resDescarga.isConfirmed) {
-                    generarTicket(
-                        ped.id.slice(-5).toUpperCase(), // Ticket ID
-                        ped.cliente,
-                        ped.producto,
-                        ped.precio,
-                        deudaAnterior,
-                        montoAbonado,
-                        Math.max(0, saldoRestante),
-                        textoEstado,
-                        metodoPago
-                    );
-                }
-            });
-        } catch (e) {
-            Swal.fire('Error', 'No se pudo guardar el abono.', 'error');
-        }
-    }
-};
-
-// ==========================================
-// 6. HISTORIAL DE PEDIDOS
-// ==========================================
-const selectFiltroHistorial = document.getElementById('filtro-historial');
-selectFiltroHistorial.addEventListener('change', renderizarHistorialPedidos);
-
-function renderizarHistorialPedidos() {
-    if (!vistas.historial.classList.contains('active')) return;
-
-    let historial = listaPedidos.filter(p => p.estado !== 'Pendiente').sort((a, b) => new Date(b.fecha_cierre) - new Date(a.fecha_cierre));
-    const tipoFiltro = selectFiltroHistorial.value;
-
-    if (tipoFiltro === 'con_saldo') {
-        historial = historial.filter(p => p.estado === 'Entregado' && (p.precio - (p.monto_pagado || 0)) > 0);
-    } else if (tipoFiltro === 'entregados') {
-        historial = historial.filter(p => p.estado === 'Entregado' && (p.precio - (p.monto_pagado || 0)) <= 0);
-    } else if (tipoFiltro === 'anulados') {
-        historial = historial.filter(p => p.estado === 'Cancelado');
+            e.target.reset(); document.getElementById('fecha-mov').value = Utils.obtenerFechaLocal();
+            Swal.fire({ icon: 'success', title: 'Registrado', timer: 1500, showConfirmButton: false });
+        } catch (err) { Swal.fire('Error', 'No se guardó el movimiento', 'error'); } finally { btn.disabled = false; }
     }
 
-    const tbody = document.getElementById('tabla-historial');
-    let html = '';
+    static async registrarDesdePedido(metodo, fecha, desc, entidad, monto) {
+        await addDoc(collection(db, "movimientos"), { tipo: 'entrada', metodo_pago: metodo, fecha, descripcion: desc, entidad, monto, timestamp: new Date() });
+    }
 
-    historial.forEach(ped => {
-        let badgeColor = ped.estado === 'Entregado' ? 'bg-success' : 'bg-danger';
-        let textoEstado = ped.estado;
-        const deuda = (ped.precio || 0) - (ped.monto_pagado || 0);
-        let textoPago = `Pagado: ₡${(ped.monto_pagado || 0).toLocaleString('es-CR')}`;
+    static renderizarReporte() {
+        if (!UIManager.vistas.reportes.classList.contains('active')) return;
+        let filt = Estado.movimientos;
+        const fIni = document.getElementById('filtro-inicio').value, fFin = document.getElementById('filtro-fin').value, fMod = document.getElementById('filtro-modo').value;
+        if (fIni) filt = filt.filter(m => m.fecha >= fIni); if (fFin) filt = filt.filter(m => m.fecha <= fFin);
+        if (fMod !== 'ambos') filt = filt.filter(m => m.tipo === (fMod === 'entradas' ? 'entrada' : 'salida'));
 
-        // Nuevo botón para reimprimir/enviar el ticket desde el historial
-        let botonesAccion = `<button class="btn btn-sm btn-outline-info" onclick="window.reimprimirTicket('${ped.id}')">Enviar Ticket</button>`;
+        Estado.datosParaExportar = filt; let tEnt = 0, tSal = 0, html = '';
+        filt.forEach(m => {
+            if (m.tipo === 'entrada') tEnt += m.monto; else tSal += m.monto;
+            html += `<tr><td class="text-nowrap">${m.fecha}</td><td><strong>${m.descripcion}</strong> <span class="badge bg-secondary ms-1">${m.metodo_pago || 'Manual'}</span><br><small class="text-muted">${m.entidad || ''}</small></td><td class="${m.tipo === 'entrada' ? 'text-success' : 'text-danger'} fw-bold text-nowrap">₡${m.monto.toLocaleString('es-CR')}</td><td class="text-center align-middle"><div class="d-flex justify-content-center gap-1"><button class="btn btn-sm btn-outline-secondary" onclick="FinanzasSystem.abrirEdicion('${m.id}')">Editar</button><button class="btn btn-sm btn-outline-danger" onclick="FinanzasSystem.borrarMov('${m.id}')">Eliminar</button></div></td></tr>`;
+        });
+        document.getElementById('tabla-reportes').innerHTML = html || '<tr><td colspan="4" class="text-center py-4">No hay movimientos registrados.</td></tr>';
+        document.getElementById('resumen-entradas').textContent = `₡${tEnt.toLocaleString('es-CR')}`; document.getElementById('resumen-salidas').textContent = `₡${tSal.toLocaleString('es-CR')}`; document.getElementById('resumen-balance').textContent = `₡${(tEnt - tSal).toLocaleString('es-CR')}`;
+        this.dibujarGrafico(tEnt, tSal, fMod);
+    }
 
-        if (ped.estado === 'Entregado') {
-            if (deuda > 0) {
-                badgeColor = 'bg-warning text-dark';
-                textoEstado = 'Con Saldo';
-                textoPago += `<br><small class="text-danger fw-bold">Debe: ₡${deuda.toLocaleString('es-CR')}</small>`;
-                botonesAccion += `<button class="btn btn-sm btn-success" onclick="window.abonarPedido('${ped.id}')">Abonar</button>`;
-            } else if (deuda < 0) {
-                textoPago += `<br><small class="text-success fw-bold">+ Propina: ₡${Math.abs(deuda).toLocaleString('es-CR')}</small>`;
-            }
-        }
+    static abrirEdicion(id) {
+        const m = Estado.movimientos.find(x => x.id === id); if (!m) return;
+        const setVal = (elId, val) => { const el = document.getElementById(elId); if (el) el.value = val; };
+        setVal('edit-id-mov', m.id); setVal('edit-tipo-mov', m.tipo); setVal('edit-fecha-mov', m.fecha);
+        setVal('edit-desc-mov', m.descripcion); setVal('edit-ent-mov', m.entidad || ''); setVal('edit-monto-mov', m.monto); setVal('edit-metodo-mov', m.metodo_pago || 'Efectivo');
+        if (Estado.modales.editarMov) Estado.modales.editarMov.show();
+    }
 
-        html += `
-            <tr>
-                <td><span class="badge ${badgeColor}">${textoEstado}</span></td>
-                <td>${ped.fecha_cierre}</td>
-                <td class="fw-bold">${ped.cliente}</td>
-                <td>${ped.producto}</td>
-                <td>${ped.estado === 'Cancelado' ? '-' : textoPago}</td>
-                <td class="text-center align-middle">
-                    <div class="d-flex justify-content-center gap-2">
-                        ${botonesAccion}
-                        <button class="btn btn-sm btn-outline-danger" onclick="window.borrarHistorialPedido('${ped.id}')">Eliminar</button>
-                    </div>
-                </td>
-            </tr>
-        `;
-    });
-    tbody.innerHTML = html || `<tr><td colspan="6" class="text-center py-4 text-muted">No hay registros con la opción seleccionada.</td></tr>`;
-}
-
-// NUEVA FUNCIÓN: Genera un ticket reflejando el estado actual desde el historial
-window.reimprimirTicket = (id) => {
-    const ped = listaPedidos.find(p => p.id === id);
-    if (!ped) return;
-
-    const precioTotal = ped.precio || 0;
-    const pagado = ped.monto_pagado || 0;
-    const saldoRestante = precioTotal - pagado;
-    let textoEstado = saldoRestante <= 0 ? 'CANCELADO EN SU TOTALIDAD' : 'SALDO PENDIENTE';
-
-    generarTicket(
-        ped.id.slice(-5).toUpperCase(), // Ticket ID
-        ped.cliente,
-        ped.producto,
-        precioTotal,
-        precioTotal,
-        pagado,
-        Math.max(0, saldoRestante),
-        textoEstado,
-        ped.ultimo_metodo_pago || "Varios / Historial" // Ahora lee el último método de pago guardado
-    );
-};
-
-window.borrarHistorialPedido = async (id) => {
-    const result = await Swal.fire({
-        title: '¿Eliminar del sistema?',
-        text: 'Se borrará el registro permanentemente. Los movimientos en caja no se borrarán.',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#d33',
-        confirmButtonText: 'Sí, borrar definitivamente'
-    });
-
-    if (result.isConfirmed) {
+    static async guardarEdicion(e) {
+        e.preventDefault(); const id = document.getElementById('edit-id-mov').value;
+        const getVal = (elId, def) => { const el = document.getElementById(elId); return el ? el.value : def; };
         try {
-            await deleteDoc(doc(db, "pedidos", id));
-            Swal.fire({ icon: 'success', title: 'Borrado', timer: 1500, showConfirmButton: false });
-        } catch (error) {
-            Swal.fire('Error', 'No se pudo eliminar el pedido.', 'error');
-        }
+            await updateDoc(doc(db, "movimientos", id), {
+                tipo: getVal('edit-tipo-mov', 'entrada'), fecha: getVal('edit-fecha-mov', Utils.obtenerFechaLocal()),
+                descripcion: getVal('edit-desc-mov', '').trim(), metodo_pago: getVal('edit-metodo-mov', 'Efectivo'),
+                entidad: getVal('edit-ent-mov', '').trim(), monto: parseFloat(getVal('edit-monto-mov', 0))
+            });
+            if (Estado.modales.editarMov) Estado.modales.editarMov.hide();
+            Swal.fire({ icon: 'success', title: 'Actualizado', timer: 1500, showConfirmButton: false });
+        } catch (e) { Swal.fire('Error', 'Fallo al actualizar.', 'error'); }
     }
-};
+
+    static async borrarMov(id) { if ((await Swal.fire({ title: '¿Eliminar movimiento?', text: 'Altera el balance de caja.', icon: 'warning', showCancelButton: true })).isConfirmed) await deleteDoc(doc(db, "movimientos", id)); }
+
+    static dibujarGrafico(e, s, m) {
+        if (window.graficoInstancia) window.graficoInstancia.destroy(); if (e === 0 && s === 0) return;
+        let l = [], d = [], c = [];
+        if (m === 'ambos') { l = ['Ingresos', 'Gastos']; d = [e, s]; c = ['#198754', '#dc3545']; }
+        else if (m === 'entradas') { l = ['Ingresos']; d = [e]; c = ['#198754']; } else { l = ['Gastos']; d = [s]; c = ['#dc3545']; }
+        window.graficoInstancia = new Chart(document.getElementById('miGrafico').getContext('2d'), { type: 'doughnut', data: { labels: l, datasets: [{ data: d, backgroundColor: c }] }, options: { responsive: true, maintainAspectRatio: false } });
+    }
+}
 
 // ==========================================
-// 7. FINANZAS Y CAJA MANUAL
+// CLASE 5: DASHBOARD E INTELIGENCIA DE NEGOCIOS (BI)
 // ==========================================
-document.getElementById('fecha-mov').value = obtenerFechaLocal();
+class DashboardSystem {
+    static renderizar() {
+        if (!UIManager.vistas.dashboard.classList.contains('active')) return;
+        this.renderUtilidadNeta();
+        this.renderCRM();
+        this.renderVolatilidad();
+        this.renderEstacionalidad();
+        this.renderRetencion();
+        this.renderGastosAgrupados();
+    }
 
-document.getElementById('form-movimiento').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const btnSubmit = e.target.querySelector('button');
-    btnSubmit.disabled = true;
+    // 1. UTILIDAD NETA (Mes Actual)
+    static renderUtilidadNeta() {
+        const mesActual = Utils.obtenerFechaLocal().substring(0, 7); // "YYYY-MM"
+        let ingresosMes = 0; let gastosMes = 0;
 
-    try {
-        await addDoc(collection(db, "movimientos"), {
-            tipo: document.getElementById('tipo').value,
-            fecha: document.getElementById('fecha-mov').value,
-            metodo_pago: document.getElementById('metodo-pago-mov').value,
-            descripcion: document.getElementById('descripcion-mov').value.trim(),
-            entidad: document.getElementById('entidad-mov').value.trim(),
-            monto: parseFloat(document.getElementById('monto-mov').value),
-            timestamp: new Date()
+        Estado.movimientos.forEach(m => {
+            if (m.fecha.startsWith(mesActual)) {
+                if (m.tipo === 'entrada') ingresosMes += m.monto;
+                else gastosMes += m.monto;
+            }
         });
 
-        e.target.reset();
-        document.getElementById('fecha-mov').value = obtenerFechaLocal();
-        Swal.fire({ icon: 'success', title: 'Movimiento Registrado', timer: 1500, showConfirmButton: false });
-    } catch (err) {
-        Swal.fire('Error', 'No se guardó el movimiento', 'error');
-    } finally {
-        btnSubmit.disabled = false;
+        const utilidad = ingresosMes - gastosMes;
+        const divMonto = document.getElementById('bi-utilidad-neta');
+        divMonto.textContent = `₡${utilidad.toLocaleString('es-CR')}`;
+        document.getElementById('bi-utilidad-detalle').textContent = `Ingresos: ₡${ingresosMes.toLocaleString('es-CR')} | Gastos: ₡${gastosMes.toLocaleString('es-CR')}`;
+
+        if (utilidad < 0) divMonto.className = "fw-bold mb-1 text-danger";
+        else if (utilidad === 0) divMonto.className = "fw-bold mb-1 text-dark";
+        else divMonto.className = "fw-bold mb-1 text-success";
     }
-});
 
-function cargarFinanzas() {
-    onSnapshot(query(collection(db, "movimientos"), orderBy("fecha", "desc")), (snapshot) => {
-        listaMovimientos = [];
-        snapshot.forEach(doc => listaMovimientos.push({ id: doc.id, ...doc.data() }));
-        if (vistas.reportes.classList.contains('active')) generarReporteFinanciero();
-        if (vistas.dashboard.classList.contains('active')) renderizarDashboard();
-    }, (error) => { /* Fallo capturado arriba en pedidos */ });
-}
-
-const filtroModoFinanzas = document.getElementById('filtro-modo');
-const filtroIniFinanzas = document.getElementById('filtro-inicio');
-const filtroFinFinanzas = document.getElementById('filtro-fin');
-[filtroModoFinanzas, filtroIniFinanzas, filtroFinFinanzas].forEach(el => el.addEventListener('input', generarReporteFinanciero));
-
-function generarReporteFinanciero() {
-    if (!vistas.reportes.classList.contains('active')) return;
-
-    let filtrados = listaMovimientos;
-    if (filtroIniFinanzas.value) filtrados = filtrados.filter(m => m.fecha >= filtroIniFinanzas.value);
-    if (filtroFinFinanzas.value) filtrados = filtrados.filter(m => m.fecha <= filtroFinFinanzas.value);
-    if (filtroModoFinanzas.value !== 'ambos') filtrados = filtrados.filter(m => m.tipo === (filtroModoFinanzas.value === 'entradas' ? 'entrada' : 'salida'));
-
-    datosParaExportar = filtrados;
-    let totalEntradas = 0;
-    let totalSalidas = 0;
-    let html = '';
-
-    filtrados.forEach(m => {
-        if (m.tipo === 'entrada') totalEntradas += m.monto;
-        else totalSalidas += m.monto;
-
-        let badgeMetodo = m.metodo_pago ? `<span class="badge bg-secondary ms-2">${m.metodo_pago}</span>` : `<span class="badge bg-secondary ms-2">Manual</span>`;
-
-        html += `
-            <tr>
-                <td class="text-nowrap">${m.fecha}</td>
-                <td><strong>${m.descripcion}</strong> ${badgeMetodo}<br><small class="text-muted">${m.entidad || ''}</small></td>
-                <td class="${m.tipo === 'entrada' ? 'text-success' : 'text-danger'} fw-bold text-nowrap">₡${m.monto.toLocaleString('es-CR')}</td>
-                <td class="text-center align-middle">
-                    <div class="d-flex justify-content-center gap-1">
-                        <button class="btn btn-sm btn-outline-secondary" onclick="window.editarMov('${m.id}')">Editar</button>
-                        <button class="btn btn-sm btn-outline-danger" onclick="window.borrarMov('${m.id}')">Eliminar</button>
-                    </div>
-                </td>
-            </tr>
-        `;
-    });
-
-    document.getElementById('tabla-reportes').innerHTML = html || '<tr><td colspan="4" class="text-center">No hay movimientos registrados.</td></tr>';
-    document.getElementById('resumen-entradas').textContent = `₡${totalEntradas.toLocaleString('es-CR')}`;
-    document.getElementById('resumen-salidas').textContent = `₡${totalSalidas.toLocaleString('es-CR')}`;
-    document.getElementById('resumen-balance').textContent = `₡${(totalEntradas - totalSalidas).toLocaleString('es-CR')}`;
-
-    dibujarGraficoFinanciero(totalEntradas, totalSalidas, filtroModoFinanzas.value);
-}
-
-window.editarMov = (id) => {
-    const mov = listaMovimientos.find(m => m.id === id);
-    if (!mov) return;
-
-    const setVal = (idEl, val) => { const el = document.getElementById(idEl); if (el) el.value = val; };
-
-    setVal('edit-id-mov', mov.id);
-    setVal('edit-tipo-mov', mov.tipo);
-    setVal('edit-fecha-mov', mov.fecha);
-    setVal('edit-desc-mov', mov.descripcion);
-    setVal('edit-ent-mov', mov.entidad || '');
-    setVal('edit-monto-mov', mov.monto);
-    setVal('edit-metodo-mov', mov.metodo_pago || 'Efectivo');
-
-    if (modalEditarMovInstancia) {
-        modalEditarMovInstancia.show();
-    } else {
-        Swal.fire('Error HTML', 'No se encontró el modal de edición en el index.html', 'error');
-    }
-};
-
-document.getElementById('form-editar-mov').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const id = document.getElementById('edit-id-mov').value;
-
-    const getVal = (idEl, defaultVal) => { const el = document.getElementById(idEl); return el ? el.value : defaultVal; };
-
-    try {
-        await updateDoc(doc(db, "movimientos", id), {
-            tipo: getVal('edit-tipo-mov', 'entrada'),
-            fecha: getVal('edit-fecha-mov', obtenerFechaLocal()),
-            descripcion: getVal('edit-desc-mov', '').trim(),
-            metodo_pago: getVal('edit-metodo-mov', 'Efectivo'),
-            entidad: getVal('edit-ent-mov', '').trim(),
-            monto: parseFloat(getVal('edit-monto-mov', 0))
+    // 2. CRM Top 5 Clientes
+    static renderCRM() {
+        const cMap = {};
+        Estado.pedidos.forEach(p => {
+            if (p.estado !== 'Cancelado' && p.cliente) {
+                const n = p.cliente.trim().toUpperCase();
+                if (!cMap[n]) cMap[n] = { tc: 0, uc: '2000-01-01', cp: 0 };
+                cMap[n].tc += (p.precio || 0); cMap[n].cp += 1;
+                if (p.fecha_solicitud > cMap[n].uc) cMap[n].uc = p.fecha_solicitud;
+            }
         });
-        if (modalEditarMovInstancia) modalEditarMovInstancia.hide();
-        Swal.fire({ icon: 'success', title: 'Registro actualizado', timer: 1500, showConfirmButton: false });
-    } catch (error) {
-        Swal.fire('Error', 'No se pudo actualizar.', 'error');
-    }
-});
-
-window.borrarMov = async (id) => {
-    const result = await Swal.fire({ title: '¿Eliminar movimiento?', text: 'Esto altera tu balance de caja.', icon: 'warning', showCancelButton: true });
-    if (result.isConfirmed) await deleteDoc(doc(db, "movimientos", id));
-};
-
-function dibujarGraficoFinanciero(entradas, salidas, modo) {
-    if (graficoInstancia) graficoInstancia.destroy();
-    if (entradas === 0 && salidas === 0) return;
-
-    let labelsGrafico = []; let datosGrafico = []; let coloresGrafico = [];
-
-    if (modo === 'ambos') {
-        labelsGrafico = ['Ingresos', 'Gastos']; datosGrafico = [entradas, salidas]; coloresGrafico = ['#198754', '#dc3545'];
-    } else if (modo === 'entradas') {
-        labelsGrafico = ['Ingresos']; datosGrafico = [entradas]; coloresGrafico = ['#198754'];
-    } else if (modo === 'salidas') {
-        labelsGrafico = ['Gastos']; datosGrafico = [salidas]; coloresGrafico = ['#dc3545'];
+        const tCli = Object.entries(cMap).sort((a, b) => b[1].tc - a[1].tc).slice(0, 5); let html = '';
+        tCli.forEach((c, i) => { html += `<li class="list-group-item d-flex justify-content-between align-items-start"><div class="ms-2 me-auto"><div class="fw-bold">${i + 1}. ${c[0]}</div><span class="small text-muted">Última: ${c[1].uc} (${c[1].cp} ped)</span></div><span class="badge bg-success rounded-pill">₡${c[1].tc.toLocaleString('es-CR')}</span></li>`; });
+        document.getElementById('lista-crm-clientes').innerHTML = html || '<li class="list-group-item">Datos insuficientes.</li>';
     }
 
-    graficoInstancia = new Chart(document.getElementById('miGrafico').getContext('2d'), {
-        type: 'doughnut',
-        data: { labels: labelsGrafico, datasets: [{ data: datosGrafico, backgroundColor: coloresGrafico }] },
-        options: { responsive: true, maintainAspectRatio: false }
-    });
-}
-
-// ==========================================
-// 8. INTELIGENCIA DE NEGOCIOS (DASHBOARD)
-// ==========================================
-function renderizarDashboard() {
-    if (!vistas.dashboard.classList.contains('active')) return;
-
-    // A. CRM: Perfiles de Clientes (Top 5 Histórico)
-    const clientesMap = {};
-
-    listaPedidos.forEach(p => {
-        if (p.estado !== 'Cancelado' && p.cliente) {
-            const nombre = p.cliente.trim().toUpperCase();
-            if (!clientesMap[nombre]) {
-                clientesMap[nombre] = { totalComprado: 0, ultimaCompra: '2000-01-01', cantidadPedidos: 0 };
-            }
-            clientesMap[nombre].totalComprado += (p.precio || 0);
-            clientesMap[nombre].cantidadPedidos += 1;
-            if (p.fecha_solicitud > clientesMap[nombre].ultimaCompra) {
-                clientesMap[nombre].ultimaCompra = p.fecha_solicitud;
-            }
-        }
-    });
-
-    const topClientes = Object.entries(clientesMap).sort((a, b) => b[1].totalComprado - a[1].totalComprado).slice(0, 5);
-    let htmlCRM = '';
-
-    topClientes.forEach((clienteObj, index) => {
-        let posicion = (index + 1) + '.';
-        htmlCRM += `
-            <li class="list-group-item d-flex justify-content-between align-items-start">
-                <div class="ms-2 me-auto">
-                    <div class="fw-bold">${posicion} ${clienteObj[0]}</div>
-                    <span class="small text-muted">Última compra: ${clienteObj[1].ultimaCompra} (${clienteObj[1].cantidadPedidos} pedidos)</span>
-                </div>
-                <span class="badge bg-success rounded-pill">₡${clienteObj[1].totalComprado.toLocaleString('es-CR')}</span>
-            </li>
-        `;
-    });
-
-    document.getElementById('lista-crm-clientes').innerHTML = htmlCRM || '<li class="list-group-item">No hay datos suficientes para generar el Top 5.</li>';
-
-    // B. VOLATILIDAD (Desviación Estándar Poblacional)
-    const ingresosPorMes = {};
-
-    listaMovimientos.filter(m => m.tipo === 'entrada').forEach(m => {
-        const mesAnio = m.fecha.substring(0, 7);
-        ingresosPorMes[mesAnio] = (ingresosPorMes[mesAnio] || 0) + m.monto;
-    });
-
-    const valoresMeses = Object.values(ingresosPorMes);
-    const boxAlerta = document.getElementById('alerta-volatilidad');
-    const txtRecomendacion = document.getElementById('stat-recomendacion');
-
-    if (valoresMeses.length < 2) {
-        document.getElementById('stat-media').textContent = 'N/A';
-        document.getElementById('stat-desv').textContent = 'N/A';
-        boxAlerta.className = 'alert alert-secondary text-center py-2 mb-3 fw-bold';
-        boxAlerta.textContent = 'Requiere más historial';
-        txtRecomendacion.textContent = 'El sistema necesita al menos 2 meses distintos de ingresos en la caja para poder calcular la volatilidad matemática de tu negocio.';
-    } else {
-        const N = valoresMeses.length;
-        const sumatoria = valoresMeses.reduce((a, b) => a + b, 0);
-        const mediaPoblacional = sumatoria / N;
-
-        const sumatoriaDiferenciasAlCuadrado = valoresMeses.reduce((acc, val) => acc + Math.pow(val - mediaPoblacional, 2), 0);
-        const varianzaPoblacional = sumatoriaDiferenciasAlCuadrado / N;
-        const desviacionEstandar = Math.sqrt(varianzaPoblacional);
-
-        const coeficienteVariacion = desviacionEstandar / mediaPoblacional;
-
-        document.getElementById('stat-media').textContent = `₡${Math.round(mediaPoblacional).toLocaleString('es-CR')}`;
-        document.getElementById('stat-desv').textContent = `₡${Math.round(desviacionEstandar).toLocaleString('es-CR')}`;
-
-        if (coeficienteVariacion > 0.4) {
-            boxAlerta.className = 'alert alert-danger text-center py-2 mb-3 fw-bold';
-            boxAlerta.innerHTML = 'Alta Volatilidad Detectada';
-            txtRecomendacion.innerHTML = 'Tus ingresos mensuales varían de forma brusca e impredecible. Sugerencia clave: Necesitas crear un fondo de emergencia empresarial que cubra los gastos fijos de MASUCRI para los meses bajos.';
-        } else if (coeficienteVariacion > 0.15) {
-            boxAlerta.className = 'alert alert-warning text-center py-2 mb-3 fw-bold text-dark';
-            boxAlerta.innerHTML = 'Volatilidad Moderada';
-            txtRecomendacion.innerHTML = 'Flujo de caja normal para un emprendimiento. Mantén reservas estándar y enfócate en fidelizar a tus clientes Top para asegurar entradas estables.';
+    // 3. RIESGO Y VOLATILIDAD
+    static renderVolatilidad() {
+        const iMes = {};
+        Estado.movimientos.filter(m => m.tipo === 'entrada').forEach(m => {
+            const ma = m.fecha.substring(0, 7); iMes[ma] = (iMes[ma] || 0) + m.monto;
+        });
+        const vals = Object.values(iMes); const bx = document.getElementById('alerta-volatilidad'); const tR = document.getElementById('stat-recomendacion');
+        if (vals.length < 2) {
+            document.getElementById('stat-media').textContent = 'N/A'; document.getElementById('stat-desv').textContent = 'N/A';
+            bx.className = 'alert alert-secondary py-2 mb-3 mt-3 fw-bold'; bx.textContent = 'Requiere 2 meses de historial'; tR.textContent = '';
         } else {
-            boxAlerta.className = 'alert alert-success text-center py-2 mb-3 fw-bold';
-            boxAlerta.innerHTML = 'Ingresos Altamente Estables';
-            txtRecomendacion.innerHTML = 'Excelente. Tus ventas son predecibles mes a mes. Este es el momento ideal para pensar en invertir sin desestabilizar tus finanzas.';
+            const media = vals.reduce((a, b) => a + b, 0) / vals.length;
+            const desv = Math.sqrt(vals.reduce((acc, val) => acc + Math.pow(val - media, 2), 0) / vals.length);
+            const coef = desv / media;
+            document.getElementById('stat-media').textContent = `₡${Math.round(media).toLocaleString('es-CR')}`; document.getElementById('stat-desv').textContent = `₡${Math.round(desv).toLocaleString('es-CR')}`;
+            if (coef > 0.4) { bx.className = 'alert alert-danger py-2 mb-3 mt-3 fw-bold'; bx.textContent = 'Alta Volatilidad'; tR.textContent = 'Tus ingresos mensuales varían bruscamenete. Requiere fondo de emergencia.'; }
+            else if (coef > 0.15) { bx.className = 'alert alert-warning py-2 mb-3 mt-3 fw-bold text-dark'; bx.textContent = 'Moderada'; tR.textContent = 'Flujo de caja normal para un emprendimiento.'; }
+            else { bx.className = 'alert alert-success py-2 mb-3 mt-3 fw-bold'; bx.textContent = 'Ingresos Estables'; tR.textContent = 'Tus ventas son predecibles. Ideal para invertir.'; }
         }
     }
 
-    // C. ESTACIONALIDAD (Clasificación de productos)
-    const categoriasContador = {};
+    // 4. RETENCIÓN VS CANCELACIÓN (NUEVO)
+    static renderRetencion() {
+        let entregados = 0; let cancelados = 0;
+        Estado.pedidos.forEach(p => {
+            if (p.estado === 'Entregado') entregados++;
+            else if (p.estado === 'Cancelado') cancelados++;
+        });
 
-    listaPedidos.forEach(p => {
-        if (p.estado !== 'Cancelado' && p.producto) {
-            const nombreProd = p.producto.toLowerCase();
-            let categoriaDeterminada = 'Otros Diseños';
+        if (window.chartRetencion) window.chartRetencion.destroy();
+        window.chartRetencion = new Chart(document.getElementById('graficoRetencion').getContext('2d'), {
+            type: 'pie',
+            data: { labels: ['Éxito (Entregados)', 'Anulados'], datasets: [{ data: [entregados, cancelados], backgroundColor: ['#198754', '#dc3545'] }] },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+    }
 
-            if (nombreProd.includes('taza') || nombreProd.includes('mug') || nombreProd.includes('vaso')) {
-                categoriaDeterminada = 'Tazas y Vasos';
-            } else if (nombreProd.includes('camis') || nombreProd.includes('textil') || nombreProd.includes('gorra')) {
-                categoriaDeterminada = 'Sublimación Textil';
-            } else if (nombreProd.includes('sticker') || nombreProd.includes('vinil') || nombreProd.includes('corte')) {
-                categoriaDeterminada = 'Vinil y Stickers';
+    // 5. ESTACIONALIDAD (Productos)
+    static renderEstacionalidad() {
+        const catMap = {};
+        Estado.pedidos.filter(p => p.estado !== 'Cancelado' && p.producto).forEach(p => {
+            const n = p.producto.toLowerCase(); let cat = 'Otros Diseños';
+            if (n.includes('taza') || n.includes('vaso') || n.includes('mug')) cat = 'Tazas/Vasos';
+            else if (n.includes('camis') || n.includes('gorra') || n.includes('textil')) cat = 'Textiles';
+            else if (n.includes('sticker') || n.includes('vinil') || n.includes('corte')) cat = 'Vinil/Stickers';
+            catMap[cat] = (catMap[cat] || 0) + 1;
+        });
+        const data = Object.entries(catMap).sort((a, b) => b[1] - a[1]);
+        if (window.chartEstacion) window.chartEstacion.destroy();
+        window.chartEstacion = new Chart(document.getElementById('graficoEstacionalidad').getContext('2d'), {
+            type: 'bar',
+            data: { labels: data.map(d => d[0]), datasets: [{ label: 'Trabajos Realizados', data: data.map(d => d[1]), backgroundColor: '#0d6efd' }] },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+    }
+
+    // 6. GASTOS AGRUPADOS POR KEYWORDS (NUEVO)
+    static renderGastosAgrupados() {
+        let gastos = { 'Materiales/Insumos': 0, 'Transporte': 0, 'Comida': 0, 'Gastos Generales': 0 };
+
+        Estado.movimientos.filter(m => m.tipo === 'salida').forEach(m => {
+            let desc = m.descripcion.toLowerCase();
+            if (desc.includes('ubora') || desc.includes('suministro') || desc.includes('material') || desc.includes('vinil') || desc.includes('tinta') || desc.includes('papel') || desc.includes('blanco')) {
+                gastos['Materiales/Insumos'] += m.monto;
+            } else if (desc.includes('pasaje') || desc.includes('bus') || desc.includes('uber') || desc.includes('transporte') || desc.includes('gasolina')) {
+                gastos['Transporte'] += m.monto;
+            } else if (desc.includes('comida') || desc.includes('almuerzo') || desc.includes('cena')) {
+                gastos['Comida'] += m.monto;
+            } else {
+                gastos['Gastos Generales'] += m.monto;
             }
+        });
 
-            categoriasContador[categoriaDeterminada] = (categoriasContador[categoriaDeterminada] || 0) + 1;
-        }
-    });
-
-    const topCategoriasArray = Object.entries(categoriasContador).sort((a, b) => b[1] - a[1]).slice(0, 5);
-
-    if (graficoEstacionalidad) graficoEstacionalidad.destroy();
-
-    graficoEstacionalidad = new Chart(document.getElementById('graficoEstacionalidad').getContext('2d'), {
-        type: 'bar',
-        data: {
-            labels: topCategoriasArray.map(c => c[0]),
-            datasets: [{
-                label: 'Cantidad de Trabajos Realizados',
-                data: topCategoriasArray.map(c => c[1]),
-                backgroundColor: '#0d6efd'
-            }]
-        },
-        options: { responsive: true, maintainAspectRatio: false }
-    });
+        if (window.chartGastos) window.chartGastos.destroy();
+        window.chartGastos = new Chart(document.getElementById('graficoGastos').getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(gastos),
+                datasets: [{ data: Object.values(gastos), backgroundColor: ['#0dcaf0', '#fd7e14', '#ffc107', '#6c757d'] }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+    }
 }
 
 // ==========================================
-// 9. EXPORTACIONES (PDF Y EXCEL)
+// CLASE 6: INICIALIZACIÓN Y EXPORTACIÓN
 // ==========================================
-document.getElementById('btn-export-pdf').addEventListener('click', () => {
-    if (datosParaExportar.length === 0) return Swal.fire('Aviso', 'No hay datos financieros para exportar', 'warning');
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
+class App {
+    static init() {
+        UIManager.init();
 
-    doc.setFontSize(16); doc.text("Reporte Financiero - MASUCRI", 14, 15);
-    doc.setFontSize(10); doc.text(`Generado: ${new Date().toLocaleDateString('es-CR')}`, 14, 22);
+        // Listeners de Formularios UI
+        document.getElementById('form-pedido').addEventListener('submit', PedidosSystem.guardar);
+        document.getElementById('form-movimiento').addEventListener('submit', FinanzasSystem.registrarManual);
+        document.getElementById('form-editar-mov').addEventListener('submit', FinanzasSystem.guardarEdicion);
 
-    const tableRows = datosParaExportar.map(m => [m.fecha, m.metodo_pago || 'Manual', m.tipo.toUpperCase(), m.descripcion, `₡${m.monto.toLocaleString('es-CR')}`]);
+        // Listeners de Exportaciones
+        document.getElementById('btn-export-pdf').addEventListener('click', () => this.exportar('pdf'));
+        document.getElementById('btn-export-excel').addEventListener('click', () => this.exportar('excel'));
 
-    doc.autoTable({
-        head: [["Fecha", "Método", "Tipo", "Concepto", "Monto"]],
-        body: tableRows,
-        startY: 28,
-        theme: 'striped'
-    });
+        // Filtros (Se actualizan en vivo al teclear)
+        ['filtro-pedido-texto', 'filtro-pedido-solicitud', 'filtro-pedido-entrega'].forEach(id => document.getElementById(id).addEventListener('input', () => PedidosSystem.renderizarPendientes()));
+        document.getElementById('btn-limpiar-pedidos').addEventListener('click', () => { ['filtro-pedido-texto', 'filtro-pedido-solicitud', 'filtro-pedido-entrega'].forEach(id => document.getElementById(id).value = ''); PedidosSystem.renderizarPendientes(); });
+        document.getElementById('filtro-historial').addEventListener('change', () => PedidosSystem.renderizarHistorial());
+        ['filtro-modo', 'filtro-inicio', 'filtro-fin'].forEach(id => document.getElementById(id).addEventListener('input', () => FinanzasSystem.renderizarReporte()));
 
-    doc.save(`Reporte_Finanzas_MASUCRI.pdf`);
-});
+        // Auth Listeners
+        document.getElementById('btn-login').addEventListener('click', () => signInWithPopup(auth, new GoogleAuthProvider()).catch(() => Swal.fire('Error', 'Fallo en login', 'error')));
+        document.getElementById('btn-logout').addEventListener('click', async () => { if ((await Swal.fire({ title: '¿Salir?', icon: 'warning', showCancelButton: true })).isConfirmed) signOut(auth); });
 
-document.getElementById('btn-export-excel').addEventListener('click', () => {
-    if (datosParaExportar.length === 0) return Swal.fire('Aviso', 'No hay datos financieros para exportar', 'warning');
+        // Vigilar Estado Auth
+        onAuthStateChanged(auth, async (user) => {
+            if (user && CORREOS_PERMITIDOS.includes(user.email)) {
+                document.getElementById('login-container').classList.add('d-none'); document.getElementById('app-container').classList.remove('d-none'); document.getElementById('app-container').classList.add('d-flex');
+                document.getElementById('user-info').textContent = `Admin: ${user.displayName}`;
 
-    const dataSheet = datosParaExportar.map(m => ({
-        "Fecha": m.fecha,
-        "Método": m.metodo_pago || 'Manual',
-        "Tipo": m.tipo.toUpperCase(),
-        "Concepto": m.descripcion,
-        "Monto (₡)": m.monto
-    }));
+                const mP = document.getElementById('modalPedido'); if (mP) Estado.modales.pedido = new bootstrap.Modal(mP);
+                const mM = document.getElementById('modalEditarMov'); if (mM) Estado.modales.editarMov = new bootstrap.Modal(mM);
 
-    const ws = XLSX.utils.json_to_sheet(dataSheet);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Reporte_Contable");
-    XLSX.writeFile(wb, `Reporte_Finanzas_MASUCRI.xlsx`);
-});
+                PedidosSystem.init(); FinanzasSystem.init(); UIManager.cambiarVista('pedidos');
+            } else if (user) { await signOut(auth); Swal.fire({ icon: 'error', title: 'Acceso Denegado' }); }
+            else { document.getElementById('login-container').classList.remove('d-none'); document.getElementById('app-container').classList.add('d-none'); document.getElementById('app-container').classList.remove('d-flex'); }
+        });
+    }
+
+    static exportar(tipo) {
+        if (Estado.datosParaExportar.length === 0) return Swal.fire('Aviso', 'Sin datos', 'warning');
+        if (tipo === 'pdf') {
+            const doc = new window.jspdf.jsPDF(); doc.text("Reporte Contable - MASUCRI", 14, 15);
+            doc.autoTable({ head: [["Fecha", "Método", "Tipo", "Concepto", "Monto"]], body: Estado.datosParaExportar.map(m => [m.fecha, m.metodo_pago || 'Manual', m.tipo.toUpperCase(), m.descripcion, `₡${m.monto.toLocaleString('es-CR')}`]), startY: 28 });
+            doc.save("Finanzas_MASUCRI.pdf");
+        } else {
+            const ws = XLSX.utils.json_to_sheet(Estado.datosParaExportar.map(m => ({ "Fecha": m.fecha, "Método": m.metodo_pago || 'Manual', "Tipo": m.tipo.toUpperCase(), "Concepto": m.descripcion, "Monto": m.monto })));
+            const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Datos"); XLSX.writeFile(wb, "Finanzas_MASUCRI.xlsx");
+        }
+    }
+}
+
+// Inicializar la App
+App.init();
+
+// Exponer módulos a Window para que los botones generados desde el HTML (onclick="") los puedan encontrar
+window.PedidosSystem = PedidosSystem;
+window.FinanzasSystem = FinanzasSystem;

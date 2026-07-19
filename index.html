@@ -363,211 +363,242 @@
 
             <!-- VISTA 5: DASHBOARD BI -->
             <div id="vista-dashboard" class="view-section">
-                <h3 class="fw-bold mb-4">Inteligencia de Negocios (BI)</h3>
-                <div class="row">
-                    <!-- CRM: Perfiles de Clientes -->
-                    <div class="col-lg-6 mb-4">
-                        <div class="card shadow-sm border-0 h-100">
-                            <div class="card-header bg-dark text-white fw-bold">Top 5 Mejores Clientes (Histórico)</div>
-                            <div class="card-body p-0">
-                                <ul class="list-group list-group-flush" id="lista-crm-clientes"></ul>
-                            </div>
-                        </div>
-                    </div>
+                <h2 class="mb-4">Inteligencia de Negocios (BI)</h2>
 
-                    <!-- ESTADÍSTICA: Desviación Estándar -->
-                    <div class="col-lg-6 mb-4">
-                        <div class="card shadow-sm border-0 h-100">
-                            <div class="card-header bg-primary text-white fw-bold">Análisis de Volatilidad (Ingresos)
-                            </div>
-                            <div class="card-body d-flex flex-column justify-content-center">
-                                <p class="text-muted small mb-2">Evalúa qué tan inestable es tu flujo de caja mensual
-                                    utilizando la desviación estándar poblacional.</p>
-                                <div id="alerta-volatilidad" class="alert alert-info text-center py-2 mb-3 fw-bold">
-                                    Calculando...</div>
-                                <div class="row text-center">
-                                    <div class="col-6">
-                                        <h6 class="text-muted">Promedio Mensual (μ)</h6>
-                                        <h4 class="fw-bold text-success" id="stat-media">₡0</h4>
-                                    </div>
-                                    <div class="col-6">
-                                        <h6 class="text-muted">Desviación Est. (σ)</h6>
-                                        <h4 class="fw-bold text-primary" id="stat-desv">₡0</h4>
-                                    </div>
-                                </div>
-                                <hr>
-                                <p class="small text-muted mb-0"><strong>Recomendación:</strong> <span
-                                        id="stat-recomendacion">Cargando...</span></p>
+                <!-- 1. UTILIDAD NETA (NUEVO) -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card border-success shadow-sm">
+                            <div class="card-body text-center bg-light">
+                                <h5 class="card-title text-success fw-bold">Utilidad Neta (Mes Actual)</h5>
+                                <h2 id="bi-utilidad-neta" class="fw-bold mb-1">₡0</h2>
+                                <small id="bi-utilidad-detalle" class="text-muted">Calculando...</small>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <div class="row">
-                    <!-- ESTACIONALIDAD -->
-                    <div class="col-12 mb-4">
-                        <div class="card shadow-sm border-0">
-                            <div class="card-header bg-white fw-bold">Categorías Más Vendidas</div>
+                    <!-- CRM: Mejores Clientes -->
+                    <div class="col-md-6 mb-4">
+                        <div class="card shadow-sm h-100">
                             <div class="card-body">
-                                <canvas id="graficoEstacionalidad" style="max-height: 300px;"></canvas>
+                                <h5 class="card-title">Top 5 Clientes Históricos</h5>
+                                <ol id="lista-crm-clientes" class="list-group list-group-numbered mt-3"></ol>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Volatilidad -->
+                    <div class="col-md-6 mb-4">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-body text-center">
+                                <h5 class="card-title">Análisis de Riesgo y Volatilidad</h5>
+                                <div id="alerta-volatilidad" class="alert alert-secondary py-2 mb-3 mt-3 fw-bold">
+                                    Analizando...</div>
+                                <div class="d-flex justify-content-around mb-2">
+                                    <div><small class="text-muted d-block">Promedio Mensual</small><strong
+                                            id="stat-media">N/A</strong></div>
+                                    <div><small class="text-muted d-block">Desviación (Riesgo)</small><strong
+                                            id="stat-desv">N/A</strong></div>
+                                </div>
+                                <p id="stat-recomendacion" class="small text-muted mt-3 mb-0"></p>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-        </div>
-    </div>
-
-    <!-- PLANTILLA OCULTA PARA EL RECIBO/TICKET DE IMAGEN -->
-    <div id="ticket-template">
-        <div class="ticket-header">
-            <img src="logo-masucri.png" alt="MASUCRI">
-            <h2>MASUCRI</h2>
-            <p>Confecciones y sublimación</p>
-        </div>
-
-        <div class="ticket-body">
-            <p><strong>Fecha:</strong> <span id="tkt-fecha"></span></p>
-            <p><strong>Cliente:</strong> <span id="tkt-cliente"></span></p>
-            <p><strong>Detalle:</strong> <span id="tkt-producto"></span></p>
-        </div>
-
-        <div class="ticket-row">
-            <span>Comprobante N°:</span>
-            <strong id="tkt-consecutivo"></strong>
-        </div>
-
-        <div class="ticket-caja">
-            <h4 style="text-align: center; margin: 0 0 15px 0;">ESTADO DE CUENTA</h4>
-
-            <div class="ticket-row">
-                <span>Total del Trabajo:</span>
-                <strong id="tkt-precio-total"></strong>
-            </div>
-            <div class="ticket-row">
-                <span>Saldo Anterior:</span>
-                <strong id="tkt-anterior"></strong>
-            </div>
-            <div class="ticket-row" style="color: #198754; font-weight: bold;">
-                <span>Total Pagado:</span>
-                <strong id="tkt-abono"></strong>
-            </div>
-            <div class="ticket-row">
-                <span>Método de Pago:</span>
-                <strong id="tkt-metodo"></strong>
-            </div>
-
-            <div class="ticket-total">
-                <span>SALDO RESTANTE:</span>
-                <strong id="tkt-saldo"></strong>
-            </div>
-        </div>
-
-        <div class="ticket-footer">
-            <span id="tkt-estado" class="badge-estado"></span>
-            <p style="margin-top: 20px; font-size: 14px; color: #555;">Gracias por preferir a MASUCRI</p>
-        </div>
-    </div>
-
-    <!-- MODAL: NUEVO / EDITAR PEDIDO -->
-    <div class="modal fade" id="modalPedido" tabindex="-1" data-bs-backdrop="static">
-        <div class="modal-dialog">
-            <div class="modal-content border-0 shadow">
-                <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title fw-bold" id="tituloModalPedido">Nuevo Pedido</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="form-pedido">
-                        <input type="hidden" id="ped-id">
-                        <div class="row mb-3">
-                            <div class="col-6">
-                                <label class="form-label fw-semibold text-muted small">Fecha Solicitud</label>
-                                <input type="date" id="ped-solicitado" class="form-control" required readonly>
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label fw-bold text-primary small">Fecha de Entrega</label>
-                                <input type="date" id="ped-entrega" class="form-control border-primary">
+                <div class="row">
+                    <!-- Tasa de Retención (NUEVO) -->
+                    <div class="col-md-4 mb-4">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-body">
+                                <h5 class="card-title text-center">Retención vs Cancelación</h5>
+                                <div style="position: relative; height: 220px; width: 100%;">
+                                    <canvas id="graficoRetencion"></canvas>
+                                </div>
                             </div>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label">Nombre del Cliente</label>
-                            <input type="text" id="ped-cliente" class="form-control" required>
+                    </div>
+
+                    <!-- Estacionalidad de Productos -->
+                    <div class="col-md-4 mb-4">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-body">
+                                <h5 class="card-title text-center">Productos más vendidos</h5>
+                                <div style="position: relative; height: 220px; width: 100%;">
+                                    <canvas id="graficoEstacionalidad"></canvas>
+                                </div>
+                            </div>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label">Producto / Servicio</label>
-                            <input type="text" id="ped-producto" class="form-control" required>
+                    </div>
+
+                    <!-- Distribución de Gastos (NUEVO) -->
+                    <div class="col-md-4 mb-4">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-body">
+                                <h5 class="card-title text-center">Fuga de Capital (Gastos)</h5>
+                                <div style="position: relative; height: 220px; width: 100%;">
+                                    <canvas id="graficoGastos"></canvas>
+                                </div>
+                            </div>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label">Descripción o Notas Adicionales</label>
-                            <textarea id="ped-desc" class="form-control" rows="2"></textarea>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Precio Total (Opcional)</label>
-                            <input type="number" id="ped-precio" class="form-control bg-light" min="0" step="0.01">
-                        </div>
-                        <button type="submit" class="btn btn-primary w-100 fw-bold shadow-sm">Guardar Pedido</button>
-                    </form>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- PLANTILLA OCULTA PARA EL RECIBO/TICKET DE IMAGEN -->
+        <div id="ticket-template">
+            <div class="ticket-header">
+                <img src="logo-masucri.png" alt="MASUCRI">
+                <h2>MASUCRI</h2>
+                <p>Confecciones y sublimación</p>
+            </div>
+
+            <div class="ticket-body">
+                <p><strong>Fecha:</strong> <span id="tkt-fecha"></span></p>
+                <p><strong>Cliente:</strong> <span id="tkt-cliente"></span></p>
+                <p><strong>Detalle:</strong> <span id="tkt-producto"></span></p>
+            </div>
+
+            <div class="ticket-row">
+                <span>Comprobante N°:</span>
+                <strong id="tkt-consecutivo"></strong>
+            </div>
+
+            <div class="ticket-caja">
+                <h4 style="text-align: center; margin: 0 0 15px 0;">ESTADO DE CUENTA</h4>
+
+                <div class="ticket-row">
+                    <span>Total del Trabajo:</span>
+                    <strong id="tkt-precio-total"></strong>
+                </div>
+                <div class="ticket-row">
+                    <span>Saldo Anterior:</span>
+                    <strong id="tkt-anterior"></strong>
+                </div>
+                <div class="ticket-row" style="color: #198754; font-weight: bold;">
+                    <span>Total Pagado:</span>
+                    <strong id="tkt-abono"></strong>
+                </div>
+                <div class="ticket-row">
+                    <span>Método de Pago:</span>
+                    <strong id="tkt-metodo"></strong>
+                </div>
+
+                <div class="ticket-total">
+                    <span>SALDO RESTANTE:</span>
+                    <strong id="tkt-saldo"></strong>
+                </div>
+            </div>
+
+            <div class="ticket-footer">
+                <span id="tkt-estado" class="badge-estado"></span>
+                <p style="margin-top: 20px; font-size: 14px; color: #555;">Gracias por preferir a MASUCRI</p>
+            </div>
+        </div>
+
+        <!-- MODAL: NUEVO / EDITAR PEDIDO -->
+        <div class="modal fade" id="modalPedido" tabindex="-1" data-bs-backdrop="static">
+            <div class="modal-dialog">
+                <div class="modal-content border-0 shadow">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title fw-bold" id="tituloModalPedido">Nuevo Pedido</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="form-pedido">
+                            <input type="hidden" id="ped-id">
+                            <div class="row mb-3">
+                                <div class="col-6">
+                                    <label class="form-label fw-semibold text-muted small">Fecha Solicitud</label>
+                                    <input type="date" id="ped-solicitado" class="form-control" required readonly>
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label fw-bold text-primary small">Fecha de Entrega</label>
+                                    <input type="date" id="ped-entrega" class="form-control border-primary">
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Nombre del Cliente</label>
+                                <input type="text" id="ped-cliente" class="form-control" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Producto / Servicio</label>
+                                <input type="text" id="ped-producto" class="form-control" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Descripción o Notas Adicionales</label>
+                                <textarea id="ped-desc" class="form-control" rows="2"></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Precio Total (Opcional)</label>
+                                <input type="number" id="ped-precio" class="form-control bg-light" min="0" step="0.01">
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100 fw-bold shadow-sm">Guardar
+                                Pedido</button>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Modal Editar Movimiento -->
-    <div class="modal fade" id="modalEditarMov" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content border-primary">
-                <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title">Editar Movimiento</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
-                        aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="form-editar-mov">
-                        <input type="hidden" id="edit-id-mov">
-                        <div class="mb-3">
-                            <label class="fw-bold">Tipo de Movimiento</label>
-                            <select id="edit-tipo-mov" class="form-select border-primary" required>
-                                <option value="entrada">Entrada (Ingreso)</option>
-                                <option value="salida">Salida (Gasto)</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="fw-bold">Fecha</label>
-                            <input type="date" id="edit-fecha-mov" class="form-control" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="fw-bold">Concepto / Descripción</label>
-                            <input type="text" id="edit-desc-mov" class="form-control" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="fw-bold">Entidad / Cliente (Opcional)</label>
-                            <input type="text" id="edit-ent-mov" class="form-control">
-                        </div>
-                        <div class="mb-3">
-                            <label class="fw-bold">Método de Pago</label>
-                            <select id="edit-metodo-mov" class="form-select">
-                                <option value="Efectivo">Efectivo</option>
-                                <option value="Sinpe Móvil">Sinpe Móvil</option>
-                                <option value="Transferencia">Transferencia</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="fw-bold">Monto (₡)</label>
-                            <input type="number" id="edit-monto-mov" class="form-control border-primary" required>
-                        </div>
-                        <div class="text-end mt-4">
-                            <button type="submit" class="btn btn-primary w-100">Guardar Cambios</button>
-                        </div>
-                    </form>
+        <!-- Modal Editar Movimiento -->
+        <div class="modal fade" id="modalEditarMov" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content border-primary">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title">Editar Movimiento</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                            aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="form-editar-mov">
+                            <input type="hidden" id="edit-id-mov">
+                            <div class="mb-3">
+                                <label class="fw-bold">Tipo de Movimiento</label>
+                                <select id="edit-tipo-mov" class="form-select border-primary" required>
+                                    <option value="entrada">Entrada (Ingreso)</option>
+                                    <option value="salida">Salida (Gasto)</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="fw-bold">Fecha</label>
+                                <input type="date" id="edit-fecha-mov" class="form-control" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="fw-bold">Concepto / Descripción</label>
+                                <input type="text" id="edit-desc-mov" class="form-control" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="fw-bold">Entidad / Cliente (Opcional)</label>
+                                <input type="text" id="edit-ent-mov" class="form-control">
+                            </div>
+                            <div class="mb-3">
+                                <label class="fw-bold">Método de Pago</label>
+                                <select id="edit-metodo-mov" class="form-select">
+                                    <option value="Efectivo">Efectivo</option>
+                                    <option value="Sinpe Móvil">Sinpe Móvil</option>
+                                    <option value="Transferencia">Transferencia</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="fw-bold">Monto (₡)</label>
+                                <input type="number" id="edit-monto-mov" class="form-control border-primary" required>
+                            </div>
+                            <div class="text-end mt-4">
+                                <button type="submit" class="btn btn-primary w-100">Guardar Cambios</button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+        <script type="module" src="app.js"></script>
 </body>
 
 </html>
