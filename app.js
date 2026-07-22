@@ -162,7 +162,10 @@ class PedidosSystem {
                 else { bClass = 'bg-success'; txtPrio = 'Baja'; }
             }
             const txtPrecio = ped.precio > 0 ? `₡${ped.precio.toLocaleString('es-CR')}` : '<span class="text-warning">Pendiente</span>';
-            html += `<tr><td><span class="badge ${bClass} w-100 py-2">${txtPrio}</span></td><td class="small"><span class="text-muted d-block">Sol: ${ped.fecha_solicitud}</span><strong class="text-dark d-block">Ent: ${ped.fecha_entrega || 'Pendiente'}</strong></td><td class="fw-bold">${ped.cliente}</td><td>${ped.producto} <br><small class="text-muted">${ped.descripcion || ''}</small></td><td class="fw-bold">${txtPrecio}</td><td class="text-center align-middle"><div class="d-flex justify-content-center gap-1"><button class="btn btn-sm btn-outline-success" onclick="PedidosSystem.entregar('${ped.id}')">Entregar</button><button class="btn btn-sm btn-outline-secondary" onclick="PedidosSystem.abrirModal('${ped.id}')">Editar</button><button class="btn btn-sm btn-outline-danger" onclick="PedidosSystem.cancelar('${ped.id}')">Anular</button></div></td></tr>`;
+            // Mostrar icono si hay telefono
+            const infoTelefono = ped.telefono ? `<br><small class="text-muted">📱 ${ped.telefono}</small>` : '';
+
+            html += `<tr><td><span class="badge ${bClass} w-100 py-2">${txtPrio}</span></td><td class="small"><span class="text-muted d-block">Sol: ${ped.fecha_solicitud}</span><strong class="text-dark d-block">Ent: ${ped.fecha_entrega || 'Pendiente'}</strong></td><td class="fw-bold">${ped.cliente}${infoTelefono}</td><td>${ped.producto} <br><small class="text-muted">${ped.descripcion || ''}</small></td><td class="fw-bold">${txtPrecio}</td><td class="text-center align-middle"><div class="d-flex justify-content-center gap-1"><button class="btn btn-sm btn-outline-success" onclick="PedidosSystem.entregar('${ped.id}')">Entregar</button><button class="btn btn-sm btn-outline-secondary" onclick="PedidosSystem.abrirModal('${ped.id}')">Editar</button><button class="btn btn-sm btn-outline-danger" onclick="PedidosSystem.cancelar('${ped.id}')">Anular</button></div></td></tr>`;
         });
         tbody.innerHTML = html || '<tr><td colspan="6" class="text-center py-4">No hay pedidos pendientes.</td></tr>';
     }
@@ -198,15 +201,24 @@ class PedidosSystem {
     }
 
     static abrirModal(id = null) {
-        document.getElementById('form-pedido').reset(); document.getElementById('ped-id').value = '';
-        document.getElementById('ped-solicitado').value = Utils.obtenerFechaLocal(); document.getElementById('tituloModalPedido').textContent = 'Nuevo Pedido';
+        document.getElementById('form-pedido').reset();
+        document.getElementById('ped-id').value = '';
+        document.getElementById('ped-solicitado').value = Utils.obtenerFechaLocal();
+        document.getElementById('ped-telefono').value = ''; // Limpiar telefono
+        document.getElementById('tituloModalPedido').textContent = 'Nuevo Pedido';
+
         if (id) {
             const p = Estado.pedidos.find(x => x.id === id);
             if (p) {
-                document.getElementById('tituloModalPedido').textContent = 'Editar Pedido'; document.getElementById('ped-id').value = p.id;
-                document.getElementById('ped-solicitado').value = p.fecha_solicitud; if (p.fecha_entrega) document.getElementById('ped-entrega').value = p.fecha_entrega;
-                document.getElementById('ped-cliente').value = p.cliente; document.getElementById('ped-producto').value = p.producto;
-                document.getElementById('ped-desc').value = p.descripcion || ''; document.getElementById('ped-precio').value = p.precio || '';
+                document.getElementById('tituloModalPedido').textContent = 'Editar Pedido';
+                document.getElementById('ped-id').value = p.id;
+                document.getElementById('ped-solicitado').value = p.fecha_solicitud;
+                if (p.fecha_entrega) document.getElementById('ped-entrega').value = p.fecha_entrega;
+                document.getElementById('ped-cliente').value = p.cliente;
+                document.getElementById('ped-telefono').value = p.telefono || ''; // Cargar telefono si existe
+                document.getElementById('ped-producto').value = p.producto;
+                document.getElementById('ped-desc').value = p.descripcion || '';
+                document.getElementById('ped-precio').value = p.precio || '';
             }
         }
         if (Estado.modales.pedido) Estado.modales.pedido.show();
@@ -215,9 +227,13 @@ class PedidosSystem {
     static async guardar(e) {
         e.preventDefault(); const id = document.getElementById('ped-id').value;
         const datos = {
-            fecha_solicitud: document.getElementById('ped-solicitado').value, fecha_entrega: document.getElementById('ped-entrega').value,
-            cliente: document.getElementById('ped-cliente').value.trim(), producto: document.getElementById('ped-producto').value.trim(),
-            descripcion: document.getElementById('ped-desc').value.trim(), precio: parseFloat(document.getElementById('ped-precio').value) || 0
+            fecha_solicitud: document.getElementById('ped-solicitado').value,
+            fecha_entrega: document.getElementById('ped-entrega').value,
+            cliente: document.getElementById('ped-cliente').value.trim(),
+            telefono: document.getElementById('ped-telefono').value.trim(), // Se agrega el telefono
+            producto: document.getElementById('ped-producto').value.trim(),
+            descripcion: document.getElementById('ped-desc').value.trim(),
+            precio: parseFloat(document.getElementById('ped-precio').value) || 0
         };
         if (datos.fecha_entrega && datos.fecha_entrega < datos.fecha_solicitud) return Swal.fire('Error', 'La fecha de entrega no puede ser menor a la de solicitud.', 'error');
         const btn = e.target.querySelector('button'); btn.disabled = true;
@@ -419,19 +435,43 @@ class DashboardSystem {
         else divMonto.className = "fw-bold mb-1 text-success";
     }
 
-    // 2. CRM Top 5 Clientes
+    // 2. CRM Top 5 Clientes - AHORA AGRUPADO POR TELÉFONO
     static renderCRM() {
         const cMap = {};
         Estado.pedidos.forEach(p => {
             if (p.estado !== 'Cancelado' && p.cliente) {
-                const n = p.cliente.trim().toUpperCase();
-                if (!cMap[n]) cMap[n] = { tc: 0, uc: '2000-01-01', cp: 0 };
-                cMap[n].tc += (p.precio || 0); cMap[n].cp += 1;
-                if (p.fecha_solicitud > cMap[n].uc) cMap[n].uc = p.fecha_solicitud;
+                // Si el cliente tiene telefono, lo usamos como ID unico. Si no, usamos el nombre.
+                const idUnico = (p.telefono && p.telefono.trim() !== '') ? p.telefono.trim() : p.cliente.trim().toUpperCase();
+
+                if (!cMap[idUnico]) {
+                    cMap[idUnico] = {
+                        nombreAMostrar: p.cliente.trim(),
+                        telefonoAMostrar: p.telefono || '',
+                        tc: 0,
+                        uc: '2000-01-01',
+                        cp: 0
+                    };
+                }
+                cMap[idUnico].tc += (p.precio || 0);
+                cMap[idUnico].cp += 1;
+                if (p.fecha_solicitud > cMap[idUnico].uc) cMap[idUnico].uc = p.fecha_solicitud;
             }
         });
-        const tCli = Object.entries(cMap).sort((a, b) => b[1].tc - a[1].tc).slice(0, 5); let html = '';
-        tCli.forEach((c, i) => { html += `<li class="list-group-item d-flex justify-content-between align-items-start"><div class="ms-2 me-auto"><div class="fw-bold">${i + 1}. ${c[0]}</div><span class="small text-muted">Última: ${c[1].uc} (${c[1].cp} ped)</span></div><span class="badge bg-success rounded-pill">₡${c[1].tc.toLocaleString('es-CR')}</span></li>`; });
+
+        const tCli = Object.entries(cMap).sort((a, b) => b[1].tc - a[1].tc).slice(0, 5);
+        let html = '';
+
+        tCli.forEach((c, i) => {
+            const data = c[1];
+            const badgeTelefono = data.telefonoAMostrar ? ` - 📱 ${data.telefonoAMostrar}` : '';
+            html += `<li class="list-group-item d-flex justify-content-between align-items-start">
+                        <div class="ms-2 me-auto">
+                            <div class="fw-bold">${i + 1}. ${data.nombreAMostrar}${badgeTelefono}</div>
+                            <span class="small text-muted">Última compra: ${data.uc} (${data.cp} pedidos)</span>
+                        </div>
+                        <span class="badge bg-success rounded-pill">₡${data.tc.toLocaleString('es-CR')}</span>
+                     </li>`;
+        });
         document.getElementById('lista-crm-clientes').innerHTML = html || '<li class="list-group-item">Datos insuficientes.</li>';
     }
 
@@ -580,3 +620,6 @@ App.init();
 // Exponer módulos a Window para que los botones generados desde el HTML (onclick="") los puedan encontrar
 window.PedidosSystem = PedidosSystem;
 window.FinanzasSystem = FinanzasSystem;
+
+// Parche de compatibilidad para el botón HTML de Nuevo Pedido
+window.abrirModalPedido = () => PedidosSystem.abrirModal();
