@@ -160,14 +160,28 @@ class PedidosSystem {
             }
 
             let txtPrecio = ped.precio > 0 ? `₡${ped.precio.toLocaleString('es-CR')}` : '<span class="text-warning">Pendiente</span>';
-            // Mostrar si hay adelanto
             if (ped.monto_pagado > 0) {
                 txtPrecio += `<br><small class="text-success fw-bold">Abonó: ₡${ped.monto_pagado.toLocaleString('es-CR')}</small>`;
             }
 
             const infoTelefono = ped.telefono ? `<br><small class="text-muted">📱 ${ped.telefono}</small>` : '';
 
-            html += `<tr><td><span class="badge ${bClass} w-100 py-2">${txtPrio}</span></td><td class="small"><span class="text-muted d-block">Sol: ${ped.fecha_solicitud}</span><strong class="text-dark d-block">Ent: ${ped.fecha_entrega || 'Pendiente'}</strong></td><td class="fw-bold">${ped.cliente}${infoTelefono}</td><td>${ped.producto} <br><small class="text-muted">${ped.descripcion || ''}</small></td><td class="fw-bold">${txtPrecio}</td><td class="text-center align-middle"><div class="d-flex justify-content-center gap-1"><button class="btn btn-sm btn-outline-success" onclick="PedidosSystem.entregar('${ped.id}')">Entregar</button><button class="btn btn-sm btn-outline-secondary" onclick="PedidosSystem.abrirModal('${ped.id}')">Editar</button><button class="btn btn-sm btn-outline-danger" onclick="PedidosSystem.cancelar('${ped.id}')">Anular</button></div></td></tr>`;
+            // BOTÓN DE ABONAR AGREGADO AQUÍ EN PENDIENTES
+            html += `<tr>
+                <td><span class="badge ${bClass} w-100 py-2">${txtPrio}</span></td>
+                <td class="small"><span class="text-muted d-block">Sol: ${ped.fecha_solicitud}</span><strong class="text-dark d-block">Ent: ${ped.fecha_entrega || 'Pendiente'}</strong></td>
+                <td class="fw-bold">${ped.cliente}${infoTelefono}</td>
+                <td>${ped.producto} <br><small class="text-muted">${ped.descripcion || ''}</small></td>
+                <td class="fw-bold">${txtPrecio}</td>
+                <td class="text-center align-middle">
+                    <div class="d-flex justify-content-center gap-1">
+                        <button class="btn btn-sm btn-outline-success" onclick="PedidosSystem.entregar('${ped.id}')">Entregar</button>
+                        <button class="btn btn-sm btn-outline-primary" onclick="PedidosSystem.abonar('${ped.id}')">Abonar</button>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="PedidosSystem.abrirModal('${ped.id}')">Editar</button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="PedidosSystem.cancelar('${ped.id}')">Anular</button>
+                    </div>
+                </td>
+            </tr>`;
         });
         tbody.innerHTML = html || '<tr><td colspan="6" class="text-center py-4">No hay pedidos pendientes.</td></tr>';
     }
@@ -207,17 +221,18 @@ class PedidosSystem {
         document.getElementById('ped-id').value = '';
         document.getElementById('ped-solicitado').value = Utils.obtenerFechaLocal();
         document.getElementById('ped-telefono').value = '';
-        document.getElementById('ped-adelanto').value = '';
-        document.getElementById('ped-metodo-adelanto').value = 'Sinpe Móvil';
-        document.getElementById('tituloModalPedido').textContent = 'Nuevo Pedido';
 
+        // Bloque de adelanto
         const elAdelanto = document.getElementById('ped-adelanto');
         const elMetodoAd = document.getElementById('ped-metodo-adelanto');
+        if (elAdelanto) elAdelanto.value = '';
+        if (elMetodoAd) elMetodoAd.value = 'Sinpe Móvil';
+
+        document.getElementById('tituloModalPedido').textContent = 'Nuevo Pedido';
 
         if (id) {
-            // Modo Edición: Bloqueamos los adelantos para no alterar finanzas pasadas
-            elAdelanto.disabled = true;
-            elMetodoAd.disabled = true;
+            if (elAdelanto) elAdelanto.disabled = true;
+            if (elMetodoAd) elMetodoAd.disabled = true;
 
             const p = Estado.pedidos.find(x => x.id === id);
             if (p) {
@@ -232,17 +247,18 @@ class PedidosSystem {
                 document.getElementById('ped-precio').value = p.precio || '';
             }
         } else {
-            // Modo Creación: Adelantos habilitados
-            elAdelanto.disabled = false;
-            elMetodoAd.disabled = false;
+            if (elAdelanto) elAdelanto.disabled = false;
+            if (elMetodoAd) elMetodoAd.disabled = false;
         }
         if (Estado.modales.pedido) Estado.modales.pedido.show();
     }
 
     static async guardar(e) {
         e.preventDefault(); const id = document.getElementById('ped-id').value;
-        const adelanto = parseFloat(document.getElementById('ped-adelanto').value) || 0;
-        const metodoAdelanto = document.getElementById('ped-metodo-adelanto').value;
+        const elAdelanto = document.getElementById('ped-adelanto');
+        const adelanto = elAdelanto ? parseFloat(elAdelanto.value) || 0 : 0;
+        const elMetodoAd = document.getElementById('ped-metodo-adelanto');
+        const metodoAdelanto = elMetodoAd ? elMetodoAd.value : 'Efectivo';
 
         const datos = {
             fecha_solicitud: document.getElementById('ped-solicitado').value,
@@ -260,7 +276,6 @@ class PedidosSystem {
         const btn = e.target.querySelector('button'); btn.disabled = true;
         try {
             if (id) {
-                // Solo actualiza, el monto pagado no se toca aquí
                 await updateDoc(doc(db, "pedidos", id), datos);
             } else {
                 datos.estado = 'Pendiente';
@@ -269,7 +284,6 @@ class PedidosSystem {
                 datos.timestamp = new Date();
                 await addDoc(collection(db, "pedidos"), datos);
 
-                // Dispara el ingreso automático a Finanzas si hubo adelanto
                 if (adelanto > 0) {
                     FinanzasSystem.registrarDesdePedido(metodoAdelanto, Utils.obtenerFechaLocal(), `Adelanto de pedido: ${datos.producto}`, datos.cliente, adelanto);
                 }
@@ -288,7 +302,6 @@ class PedidosSystem {
             if (!nP) return; pTot = parseFloat(nP); await updateDoc(doc(db, "pedidos", id), { precio: pTot }); ped.precio = pTot;
         }
 
-        // Se calcula el saldo restante tomando en cuenta los adelantos
         const saldoPendiente = pTot - (ped.monto_pagado || 0);
 
         const r = await Swal.fire({
@@ -323,26 +336,37 @@ class PedidosSystem {
         }
     }
 
+    // AHORA PERMITE ABONAR INCLUSO EN PENDIENTES
     static async abonar(id) {
         const ped = Estado.pedidos.find(p => p.id === id); if (!ped) return;
-        const dAnt = ped.precio - (ped.monto_pagado || 0);
+
+        let pTot = ped.precio;
+        // Si el precio total es 0 o no se ha definido, lo pedimos para calcular la deuda
+        if (!pTot || pTot === 0) {
+            const { value: nP } = await Swal.fire({ title: 'Fijar Precio Final', text: 'Antes de abonar, debes definir el precio total del pedido:', input: 'number', showCancelButton: true, inputValidator: v => (!v || v <= 0) ? 'Ingrese monto mayor a 0' : null });
+            if (!nP) return; pTot = parseFloat(nP); await updateDoc(doc(db, "pedidos", id), { precio: pTot }); ped.precio = pTot;
+        }
+
+        const dAnt = pTot - (ped.monto_pagado || 0);
+        if (dAnt <= 0) return Swal.fire('Aviso', 'Este pedido ya está pagado en su totalidad.', 'info');
+
         const r = await Swal.fire({
-            title: 'Nuevo Abono',
-            html: `<div class="text-start mb-2"><label class="fw-bold">Deuda Actual: ₡${dAnt.toLocaleString()}</label><input id="swal-monto" type="number" class="form-control border-success"></div>
-            <div class="text-start"><label class="fw-bold">Método</label><select id="swal-metodo" class="form-select"><option>Efectivo</option><option>Sinpe Móvil</option><option>Transferencia</option></select></div>`,
+            title: 'Registrar Abono',
+            html: `<div class="text-start mb-2"><label class="fw-bold">Deuda Actual: ₡${dAnt.toLocaleString()}</label><input id="swal-monto" type="number" class="form-control border-success mt-1" placeholder="Monto a abonar"></div>
+            <div class="text-start"><label class="fw-bold">Método</label><select id="swal-metodo" class="form-select mt-1"><option>Efectivo</option><option>Sinpe Móvil</option><option>Transferencia</option></select></div>`,
             showCancelButton: true, confirmButtonText: 'Guardar', preConfirm: () => {
                 const m = parseFloat(document.getElementById('swal-monto').value);
-                if (!m || m <= 0) { Swal.showValidationMessage('Ingrese un monto mayor a 0'); return false; }
+                if (!m || m <= 0 || m > dAnt) { Swal.showValidationMessage(`Ingrese un monto entre 1 y ${dAnt}`); return false; }
                 return { m, met: document.getElementById('swal-metodo').value };
             }
         });
         if (r.isConfirmed) {
-            const { m, met } = r.value; const nPagado = (ped.monto_pagado || 0) + m; const saldo = ped.precio - nPagado;
+            const { m, met } = r.value; const nPagado = (ped.monto_pagado || 0) + m; const saldo = pTot - nPagado;
             try {
                 await updateDoc(doc(db, "pedidos", id), { monto_pagado: nPagado, ultimo_metodo_pago: met });
                 FinanzasSystem.registrarDesdePedido(met, Utils.obtenerFechaLocal(), `Abono a deuda: ${ped.producto}`, ped.cliente, m);
                 if ((await Swal.fire({ title: 'Abono registrado', icon: 'success', showCancelButton: true, confirmButtonText: 'Ticket' })).isConfirmed) {
-                    TicketSystem.generar(ped.id.slice(-5).toUpperCase(), ped.cliente, ped.producto, ped.precio, dAnt, m, Math.max(0, saldo), saldo <= 0 ? 'CANCELADO' : 'ABONO', met);
+                    TicketSystem.generar(ped.id.slice(-5).toUpperCase(), ped.cliente, ped.producto, pTot, dAnt, m, Math.max(0, saldo), saldo <= 0 ? 'CANCELADO' : 'ABONO', met);
                 }
             } catch (e) { Swal.fire('Error', 'No se pudo guardar el abono.', 'error'); }
         }
@@ -480,12 +504,10 @@ class DashboardSystem {
         else divMonto.className = "fw-bold mb-1 text-success";
     }
 
-    // CRM Top 5 Clientes - AHORA LIMPIANDO GUIONES Y ESPACIOS
     static renderCRM() {
         const cMap = {};
         Estado.pedidos.forEach(p => {
             if (p.estado !== 'Cancelado' && p.cliente) {
-                // Limpia el teléfono (elimina todo lo que no sea número para agrupar exacto)
                 const telLimpio = p.telefono ? p.telefono.replace(/[\s-]/g, '') : '';
                 const idUnico = (telLimpio !== '') ? telLimpio : p.cliente.trim().toUpperCase();
 
@@ -618,11 +640,41 @@ class App {
         document.getElementById('btn-export-pdf').addEventListener('click', () => this.exportar('pdf'));
         document.getElementById('btn-export-excel').addEventListener('click', () => this.exportar('excel'));
 
-        // Filtros (Se actualizan en vivo al teclear)
+        // Filtros
         ['filtro-pedido-texto', 'filtro-pedido-solicitud', 'filtro-pedido-entrega'].forEach(id => document.getElementById(id).addEventListener('input', () => PedidosSystem.renderizarPendientes()));
         document.getElementById('btn-limpiar-pedidos').addEventListener('click', () => { ['filtro-pedido-texto', 'filtro-pedido-solicitud', 'filtro-pedido-entrega'].forEach(id => document.getElementById(id).value = ''); PedidosSystem.renderizarPendientes(); });
         document.getElementById('filtro-historial').addEventListener('change', () => PedidosSystem.renderizarHistorial());
         ['filtro-modo', 'filtro-inicio', 'filtro-fin'].forEach(id => document.getElementById(id).addEventListener('input', () => FinanzasSystem.renderizarReporte()));
+
+        // MOTOR DE LA AGENDA DE CONTACTOS
+        const btnContactos = document.getElementById('btn-contactos');
+        if (btnContactos) {
+            // Verificamos si el celular soporta esta tecnología tan nueva
+            if ('contacts' in navigator && 'ContactsManager' in window) {
+                btnContactos.addEventListener('click', async () => {
+                    try {
+                        const contactosAgarrados = await navigator.contacts.select(['name', 'tel'], { multiple: false });
+                        if (contactosAgarrados.length > 0) {
+                            const contacto = contactosAgarrados[0];
+                            // Llenar el teléfono (limpiando espacios y +506)
+                            if (contacto.tel && contacto.tel.length > 0) {
+                                let num = contacto.tel[0].replace(/[\s-]/g, '');
+                                if (num.startsWith('+506')) num = num.substring(4);
+                                document.getElementById('ped-telefono').value = num;
+                            }
+                            // Llenar el nombre si el campo estaba vacío
+                            if (contacto.name && contacto.name.length > 0) {
+                                const inputNombre = document.getElementById('ped-cliente');
+                                if (!inputNombre.value) inputNombre.value = contacto.name[0];
+                            }
+                        }
+                    } catch (ex) { console.log("Selección de contacto cancelada."); }
+                });
+            } else {
+                // Si está en PC o en un navegador viejo, ocultamos el botón para no confundir
+                btnContactos.style.display = 'none';
+            }
+        }
 
         // Auth Listeners
         document.getElementById('btn-login').addEventListener('click', () => signInWithPopup(auth, new GoogleAuthProvider()).catch(() => Swal.fire('Error', 'Fallo en login', 'error')));
