@@ -23,7 +23,6 @@ const db = getFirestore(app);
 
 const CORREOS_PERMITIDOS = ["ulloarodriguezchris@gmail.com", "anisrmj5@gmail.com"];
 
-// El Estado Global centraliza las listas para que todas las clases puedan leerlas
 const Estado = {
     movimientos: [],
     pedidos: [],
@@ -67,10 +66,8 @@ class TicketSystem {
                 const file = new File([blob], `Ticket_${cliente.replace(/\s+/g, '_')}.png`, { type: 'image/png' });
 
                 if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                    try {
-                        // WhatsApp en blanco, solo adjunta la imagen
-                        await navigator.share({ files: [file], title: 'Comprobante MASUCRI' });
-                    } catch (err) { console.log("Compartir cancelado"); }
+                    try { await navigator.share({ files: [file], title: 'Comprobante MASUCRI' }); }
+                    catch (err) { console.log("Compartir cancelado"); }
                 } else {
                     const link = document.createElement('a'); link.download = file.name; link.href = URL.createObjectURL(blob); link.click();
                     const r = await Swal.fire({ title: 'Imagen Descargada', text: 'Tu navegador no soporta envío directo.', icon: 'info', confirmButtonText: 'Abrir WhatsApp Web', showCancelButton: true });
@@ -161,8 +158,13 @@ class PedidosSystem {
                 else if (diff <= 5) { bClass = 'bg-info text-dark'; txtPrio = 'Media'; }
                 else { bClass = 'bg-success'; txtPrio = 'Baja'; }
             }
-            const txtPrecio = ped.precio > 0 ? `₡${ped.precio.toLocaleString('es-CR')}` : '<span class="text-warning">Pendiente</span>';
-            // Mostrar icono si hay telefono
+
+            let txtPrecio = ped.precio > 0 ? `₡${ped.precio.toLocaleString('es-CR')}` : '<span class="text-warning">Pendiente</span>';
+            // Mostrar si hay adelanto
+            if (ped.monto_pagado > 0) {
+                txtPrecio += `<br><small class="text-success fw-bold">Abonó: ₡${ped.monto_pagado.toLocaleString('es-CR')}</small>`;
+            }
+
             const infoTelefono = ped.telefono ? `<br><small class="text-muted">📱 ${ped.telefono}</small>` : '';
 
             html += `<tr><td><span class="badge ${bClass} w-100 py-2">${txtPrio}</span></td><td class="small"><span class="text-muted d-block">Sol: ${ped.fecha_solicitud}</span><strong class="text-dark d-block">Ent: ${ped.fecha_entrega || 'Pendiente'}</strong></td><td class="fw-bold">${ped.cliente}${infoTelefono}</td><td>${ped.producto} <br><small class="text-muted">${ped.descripcion || ''}</small></td><td class="fw-bold">${txtPrecio}</td><td class="text-center align-middle"><div class="d-flex justify-content-center gap-1"><button class="btn btn-sm btn-outline-success" onclick="PedidosSystem.entregar('${ped.id}')">Entregar</button><button class="btn btn-sm btn-outline-secondary" onclick="PedidosSystem.abrirModal('${ped.id}')">Editar</button><button class="btn btn-sm btn-outline-danger" onclick="PedidosSystem.cancelar('${ped.id}')">Anular</button></div></td></tr>`;
@@ -192,7 +194,7 @@ class PedidosSystem {
                     txtPago += `<br><small class="text-danger fw-bold">Debe: ₡${deuda.toLocaleString('es-CR')}</small>`;
                     btns += `<button class="btn btn-sm btn-success" onclick="PedidosSystem.abonar('${ped.id}')">Abonar</button>`;
                 } else if (deuda < 0) {
-                    textoPago += `<br><small class="text-success fw-bold">+ Propina: ₡${Math.abs(deuda).toLocaleString('es-CR')}</small>`;
+                    txtPago += `<br><small class="text-success fw-bold">+ Propina: ₡${Math.abs(deuda).toLocaleString('es-CR')}</small>`;
                 }
             }
             html += `<tr><td><span class="badge ${bColor}">${txtEst}</span></td><td>${ped.fecha_cierre}</td><td class="fw-bold">${ped.cliente}</td><td>${ped.producto}</td><td>${ped.estado === 'Cancelado' ? '-' : txtPago}</td><td class="text-center align-middle"><div class="d-flex justify-content-center gap-2">${btns}<button class="btn btn-sm btn-outline-danger" onclick="PedidosSystem.borrarHistorial('${ped.id}')">Eliminar</button></div></td></tr>`;
@@ -204,10 +206,19 @@ class PedidosSystem {
         document.getElementById('form-pedido').reset();
         document.getElementById('ped-id').value = '';
         document.getElementById('ped-solicitado').value = Utils.obtenerFechaLocal();
-        document.getElementById('ped-telefono').value = ''; // Limpiar telefono
+        document.getElementById('ped-telefono').value = '';
+        document.getElementById('ped-adelanto').value = '';
+        document.getElementById('ped-metodo-adelanto').value = 'Sinpe Móvil';
         document.getElementById('tituloModalPedido').textContent = 'Nuevo Pedido';
 
+        const elAdelanto = document.getElementById('ped-adelanto');
+        const elMetodoAd = document.getElementById('ped-metodo-adelanto');
+
         if (id) {
+            // Modo Edición: Bloqueamos los adelantos para no alterar finanzas pasadas
+            elAdelanto.disabled = true;
+            elMetodoAd.disabled = true;
+
             const p = Estado.pedidos.find(x => x.id === id);
             if (p) {
                 document.getElementById('tituloModalPedido').textContent = 'Editar Pedido';
@@ -215,31 +226,54 @@ class PedidosSystem {
                 document.getElementById('ped-solicitado').value = p.fecha_solicitud;
                 if (p.fecha_entrega) document.getElementById('ped-entrega').value = p.fecha_entrega;
                 document.getElementById('ped-cliente').value = p.cliente;
-                document.getElementById('ped-telefono').value = p.telefono || ''; // Cargar telefono si existe
+                document.getElementById('ped-telefono').value = p.telefono || '';
                 document.getElementById('ped-producto').value = p.producto;
                 document.getElementById('ped-desc').value = p.descripcion || '';
                 document.getElementById('ped-precio').value = p.precio || '';
             }
+        } else {
+            // Modo Creación: Adelantos habilitados
+            elAdelanto.disabled = false;
+            elMetodoAd.disabled = false;
         }
         if (Estado.modales.pedido) Estado.modales.pedido.show();
     }
 
     static async guardar(e) {
         e.preventDefault(); const id = document.getElementById('ped-id').value;
+        const adelanto = parseFloat(document.getElementById('ped-adelanto').value) || 0;
+        const metodoAdelanto = document.getElementById('ped-metodo-adelanto').value;
+
         const datos = {
             fecha_solicitud: document.getElementById('ped-solicitado').value,
             fecha_entrega: document.getElementById('ped-entrega').value,
             cliente: document.getElementById('ped-cliente').value.trim(),
-            telefono: document.getElementById('ped-telefono').value.trim(), // Se agrega el telefono
+            telefono: document.getElementById('ped-telefono').value.trim(),
             producto: document.getElementById('ped-producto').value.trim(),
             descripcion: document.getElementById('ped-desc').value.trim(),
             precio: parseFloat(document.getElementById('ped-precio').value) || 0
         };
+
         if (datos.fecha_entrega && datos.fecha_entrega < datos.fecha_solicitud) return Swal.fire('Error', 'La fecha de entrega no puede ser menor a la de solicitud.', 'error');
+        if (adelanto > datos.precio && datos.precio > 0) return Swal.fire('Error', 'El adelanto no puede ser mayor al precio total.', 'error');
+
         const btn = e.target.querySelector('button'); btn.disabled = true;
         try {
-            if (id) await updateDoc(doc(db, "pedidos", id), datos);
-            else { datos.estado = 'Pendiente'; datos.monto_pagado = 0; datos.timestamp = new Date(); await addDoc(collection(db, "pedidos"), datos); }
+            if (id) {
+                // Solo actualiza, el monto pagado no se toca aquí
+                await updateDoc(doc(db, "pedidos", id), datos);
+            } else {
+                datos.estado = 'Pendiente';
+                datos.monto_pagado = adelanto;
+                if (adelanto > 0) datos.ultimo_metodo_pago = metodoAdelanto;
+                datos.timestamp = new Date();
+                await addDoc(collection(db, "pedidos"), datos);
+
+                // Dispara el ingreso automático a Finanzas si hubo adelanto
+                if (adelanto > 0) {
+                    FinanzasSystem.registrarDesdePedido(metodoAdelanto, Utils.obtenerFechaLocal(), `Adelanto de pedido: ${datos.producto}`, datos.cliente, adelanto);
+                }
+            }
             if (Estado.modales.pedido) Estado.modales.pedido.hide();
             Swal.fire({ icon: 'success', title: 'Guardado correctamente', timer: 1000, showConfirmButton: false });
         } catch (error) { Swal.fire('Error', 'No se pudo guardar.', 'error'); } finally { btn.disabled = false; }
@@ -248,30 +282,42 @@ class PedidosSystem {
     static async entregar(id) {
         const ped = Estado.pedidos.find(p => p.id === id); if (!ped) return;
         let pTot = ped.precio;
+
         if (!pTot || pTot === 0) {
             const { value: nP } = await Swal.fire({ title: 'Fijar Precio Final', input: 'number', showCancelButton: true, inputValidator: v => (!v || v <= 0) ? 'Ingrese monto mayor a 0' : null });
             if (!nP) return; pTot = parseFloat(nP); await updateDoc(doc(db, "pedidos", id), { precio: pTot }); ped.precio = pTot;
         }
+
+        // Se calcula el saldo restante tomando en cuenta los adelantos
+        const saldoPendiente = pTot - (ped.monto_pagado || 0);
+
         const r = await Swal.fire({
             title: 'Entregar y Cobrar',
-            html: `<div class="text-start mb-2"><label class="fw-bold">Pagado hoy (Total: ₡${pTot})</label><input id="swal-monto" type="number" class="form-control border-primary" value="${pTot}"><small class="text-muted">Si el pago queda pendiente, ingresa 0.</small></div>
+            html: `<div class="text-start mb-2"><label class="fw-bold">Pagado hoy (Resta cobrar: ₡${saldoPendiente.toLocaleString()})</label><input id="swal-monto" type="number" class="form-control border-primary" value="${saldoPendiente}"><small class="text-muted">Si el pago queda pendiente, ingresa 0.</small></div>
                    <div class="text-start"><label class="fw-bold">Método de Pago</label><select id="swal-metodo" class="form-select border-primary"><option>Efectivo</option><option>Sinpe Móvil</option><option>Transferencia</option></select></div>`,
             showCancelButton: true, confirmButtonText: 'Registrar', confirmButtonColor: '#198754',
             preConfirm: () => {
                 const crudo = document.getElementById('swal-monto').value;
                 const m = parseFloat(crudo);
-                if (crudo === '' || isNaN(m) || m < 0) { Swal.showValidationMessage('Ingrese un monto válido (puede ser 0)'); return false; }
+                if (crudo === '' || isNaN(m) || m < 0) { Swal.showValidationMessage('Ingrese un monto válido'); return false; }
                 return { monto: m, metodo: document.getElementById('swal-metodo').value };
             }
         });
+
         if (r.isConfirmed) {
-            const cobrado = r.value.monto, metodo = r.value.metodo, hoy = Utils.obtenerFechaLocal();
+            const cobradoHoy = r.value.monto;
+            const metodo = r.value.metodo;
+            const hoy = Utils.obtenerFechaLocal();
+            const totalPagadoHistorico = (ped.monto_pagado || 0) + cobradoHoy;
+            const saldoFinalDeuda = pTot - totalPagadoHistorico;
+
             try {
-                await updateDoc(doc(db, "pedidos", id), { estado: 'Entregado', monto_pagado: cobrado, fecha_cierre: hoy, ultimo_metodo_pago: metodo });
-                if (cobrado > 0) FinanzasSystem.registrarDesdePedido(metodo, hoy, `Pago de pedido: ${ped.producto}`, ped.cliente, cobrado);
-                const saldo = pTot - cobrado;
+                await updateDoc(doc(db, "pedidos", id), { estado: 'Entregado', monto_pagado: totalPagadoHistorico, fecha_cierre: hoy, ultimo_metodo_pago: metodo });
+
+                if (cobradoHoy > 0) FinanzasSystem.registrarDesdePedido(metodo, hoy, `Pago final de pedido: ${ped.producto}`, ped.cliente, cobradoHoy);
+
                 if ((await Swal.fire({ title: 'Éxito', text: '¿Enviar ticket?', icon: 'success', showCancelButton: true })).isConfirmed) {
-                    TicketSystem.generar(ped.id.slice(-5).toUpperCase(), ped.cliente, ped.producto, pTot, pTot, cobrado, Math.max(0, saldo), saldo <= 0 ? 'CANCELADO' : 'SALDO PENDIENTE', metodo);
+                    TicketSystem.generar(ped.id.slice(-5).toUpperCase(), ped.cliente, ped.producto, pTot, saldoPendiente, cobradoHoy, Math.max(0, saldoFinalDeuda), saldoFinalDeuda <= 0 ? 'CANCELADO' : 'SALDO PENDIENTE', metodo);
                 }
             } catch (e) { Swal.fire('Error', 'Ocurrió un problema guardando en la base de datos.', 'error'); }
         }
@@ -282,7 +328,7 @@ class PedidosSystem {
         const dAnt = ped.precio - (ped.monto_pagado || 0);
         const r = await Swal.fire({
             title: 'Nuevo Abono',
-            html: `<div class="text-start mb-2"><label class="fw-bold">Deuda Actual: ₡${dAnt}</label><input id="swal-monto" type="number" class="form-control border-success"></div>
+            html: `<div class="text-start mb-2"><label class="fw-bold">Deuda Actual: ₡${dAnt.toLocaleString()}</label><input id="swal-monto" type="number" class="form-control border-success"></div>
             <div class="text-start"><label class="fw-bold">Método</label><select id="swal-metodo" class="form-select"><option>Efectivo</option><option>Sinpe Móvil</option><option>Transferencia</option></select></div>`,
             showCancelButton: true, confirmButtonText: 'Guardar', preConfirm: () => {
                 const m = parseFloat(document.getElementById('swal-monto').value);
@@ -413,9 +459,8 @@ class DashboardSystem {
         this.renderGastosAgrupados();
     }
 
-    // 1. UTILIDAD NETA (Mes Actual)
     static renderUtilidadNeta() {
-        const mesActual = Utils.obtenerFechaLocal().substring(0, 7); // "YYYY-MM"
+        const mesActual = Utils.obtenerFechaLocal().substring(0, 7);
         let ingresosMes = 0; let gastosMes = 0;
 
         Estado.movimientos.forEach(m => {
@@ -435,13 +480,14 @@ class DashboardSystem {
         else divMonto.className = "fw-bold mb-1 text-success";
     }
 
-    // 2. CRM Top 5 Clientes - AHORA AGRUPADO POR TELÉFONO
+    // CRM Top 5 Clientes - AHORA LIMPIANDO GUIONES Y ESPACIOS
     static renderCRM() {
         const cMap = {};
         Estado.pedidos.forEach(p => {
             if (p.estado !== 'Cancelado' && p.cliente) {
-                // Si el cliente tiene telefono, lo usamos como ID unico. Si no, usamos el nombre.
-                const idUnico = (p.telefono && p.telefono.trim() !== '') ? p.telefono.trim() : p.cliente.trim().toUpperCase();
+                // Limpia el teléfono (elimina todo lo que no sea número para agrupar exacto)
+                const telLimpio = p.telefono ? p.telefono.replace(/[\s-]/g, '') : '';
+                const idUnico = (telLimpio !== '') ? telLimpio : p.cliente.trim().toUpperCase();
 
                 if (!cMap[idUnico]) {
                     cMap[idUnico] = {
@@ -475,7 +521,6 @@ class DashboardSystem {
         document.getElementById('lista-crm-clientes').innerHTML = html || '<li class="list-group-item">Datos insuficientes.</li>';
     }
 
-    // 3. RIESGO Y VOLATILIDAD
     static renderVolatilidad() {
         const iMes = {};
         Estado.movimientos.filter(m => m.tipo === 'entrada').forEach(m => {
@@ -496,7 +541,6 @@ class DashboardSystem {
         }
     }
 
-    // 4. RETENCIÓN VS CANCELACIÓN (NUEVO)
     static renderRetencion() {
         let entregados = 0; let cancelados = 0;
         Estado.pedidos.forEach(p => {
@@ -512,7 +556,6 @@ class DashboardSystem {
         });
     }
 
-    // 5. ESTACIONALIDAD (Productos)
     static renderEstacionalidad() {
         const catMap = {};
         Estado.pedidos.filter(p => p.estado !== 'Cancelado' && p.producto).forEach(p => {
@@ -531,7 +574,6 @@ class DashboardSystem {
         });
     }
 
-    // 6. GASTOS AGRUPADOS POR KEYWORDS (NUEVO)
     static renderGastosAgrupados() {
         let gastos = { 'Materiales/Insumos': 0, 'Transporte': 0, 'Comida': 0, 'Gastos Generales': 0 };
 
@@ -617,9 +659,7 @@ class App {
 // Inicializar la App
 App.init();
 
-// Exponer módulos a Window para que los botones generados desde el HTML (onclick="") los puedan encontrar
+// Exponer módulos a Window
 window.PedidosSystem = PedidosSystem;
 window.FinanzasSystem = FinanzasSystem;
-
-// Parche de compatibilidad para el botón HTML de Nuevo Pedido
 window.abrirModalPedido = () => PedidosSystem.abrirModal();
