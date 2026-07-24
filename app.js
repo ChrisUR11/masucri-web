@@ -3,7 +3,8 @@
 // ==========================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+// SE AGREGÓ: enableIndexedDbPersistence para el MODO OFFLINE
+import { getFirestore, enableIndexedDbPersistence, collection, addDoc, onSnapshot, query, orderBy, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
 // ==========================================
 // 2. CONFIGURACIÓN Y ESTADO GLOBAL
@@ -20,6 +21,12 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+
+// ACTIVAR MODO OFFLINE (Caché local)
+enableIndexedDbPersistence(db).catch((err) => {
+    if (err.code == 'failed-precondition') console.log("Múltiples pestañas abiertas, persistencia falló");
+    else if (err.code == 'unimplemented') console.log("Navegador no soporta persistencia");
+});
 
 const CORREOS_PERMITIDOS = ["ulloarodriguezchris@gmail.com", "anisrmj5@gmail.com"];
 
@@ -122,14 +129,31 @@ class UIManager {
 // CLASE 3: SISTEMA DE PEDIDOS
 // ==========================================
 class PedidosSystem {
+    // Variable para controlar cuántos elementos del historial mostramos
+    static limiteHistorial = 50;
+
     static init() {
         onSnapshot(query(collection(db, "pedidos"), orderBy("fecha_entrega", "asc")), (snapshot) => {
             Estado.pedidos = [];
             snapshot.forEach(doc => Estado.pedidos.push({ id: doc.id, ...doc.data() }));
+
+            this.actualizarCatalogo(); // Rellena el autocompletado
             this.renderizarPendientes();
             this.renderizarHistorial();
             if (UIManager.vistas.dashboard.classList.contains('active')) DashboardSystem.renderizar();
         }, (err) => { if (err.code === 'permission-denied') Swal.fire('Seguridad', 'Las reglas de Firebase bloquearon el acceso.', 'error'); });
+    }
+
+    // EXTRAE LOS PRODUCTOS ÚNICOS PARA EL AUTOCOMPLETADO
+    static actualizarCatalogo() {
+        const listaHtml = document.getElementById('catalogo-productos');
+        if (!listaHtml) return;
+
+        // Recolectamos todos los nombres de productos, quitamos repetidos y espacios vacíos
+        const productosUnicos = [...new Set(Estado.pedidos.map(p => p.producto ? p.producto.trim() : ''))].filter(p => p !== '');
+
+        // Creamos las opciones del datalist
+        listaHtml.innerHTML = productosUnicos.map(prod => `<option value="${prod}">`).join('');
     }
 
     static renderizarPendientes() {
@@ -166,7 +190,6 @@ class PedidosSystem {
 
             const infoTelefono = ped.telefono ? `<br><small class="text-muted">📱 ${ped.telefono}</small>` : '';
 
-            // BOTÓN DE ABONAR AGREGADO AQUÍ EN PENDIENTES
             html += `<tr>
                 <td><span class="badge ${bClass} w-100 py-2">${txtPrio}</span></td>
                 <td class="small"><span class="text-muted d-block">Sol: ${ped.fecha_solicitud}</span><strong class="text-dark d-block">Ent: ${ped.fecha_entrega || 'Pendiente'}</strong></td>
@@ -188,6 +211,7 @@ class PedidosSystem {
 
     static renderizarHistorial() {
         if (!UIManager.vistas.historial.classList.contains('active')) return;
+
         let historial = Estado.pedidos.filter(p => p.estado !== 'Pendiente').sort((a, b) => new Date(b.fecha_cierre) - new Date(a.fecha_cierre));
         const filtro = document.getElementById('filtro-historial').value;
 
@@ -195,8 +219,14 @@ class PedidosSystem {
         else if (filtro === 'entregados') historial = historial.filter(p => p.estado === 'Entregado' && (p.precio - (p.monto_pagado || 0)) <= 0);
         else if (filtro === 'anulados') historial = historial.filter(p => p.estado === 'Cancelado');
 
-        const tbody = document.getElementById('tabla-historial'); let html = '';
-        historial.forEach(ped => {
+        const totalHistorial = historial.length;
+        // Cortamos el arreglo para mostrar solo el límite establecido (para que el DOM sea rápido)
+        const historialCortado = historial.slice(0, this.limiteHistorial);
+
+        const tbody = document.getElementById('tabla-historial');
+        let html = '';
+
+        historialCortado.forEach(ped => {
             let bColor = ped.estado === 'Entregado' ? 'bg-success' : 'bg-danger';
             let txtEst = ped.estado; const deuda = (ped.precio || 0) - (ped.monto_pagado || 0);
             let txtPago = `Pagado: ₡${(ped.monto_pagado || 0).toLocaleString('es-CR')}`;
@@ -213,6 +243,12 @@ class PedidosSystem {
             }
             html += `<tr><td><span class="badge ${bColor}">${txtEst}</span></td><td>${ped.fecha_cierre}</td><td class="fw-bold">${ped.cliente}</td><td>${ped.producto}</td><td>${ped.estado === 'Cancelado' ? '-' : txtPago}</td><td class="text-center align-middle"><div class="d-flex justify-content-center gap-2">${btns}<button class="btn btn-sm btn-outline-danger" onclick="PedidosSystem.borrarHistorial('${ped.id}')">Eliminar</button></div></td></tr>`;
         });
+
+        // BOTÓN DE CARGAR MÁS si quedan elementos ocultos
+        if (totalHistorial > this.limiteHistorial) {
+            html += `<tr><td colspan="6" class="text-center py-3"><button class="btn btn-sm btn-secondary" onclick="window.cargarMasHistorial()">👇 Cargar más antiguos (${totalHistorial - this.limiteHistorial} restantes)</button></td></tr>`;
+        }
+
         tbody.innerHTML = html || `<tr><td colspan="6" class="text-center py-4 text-muted">No hay registros con la opción seleccionada.</td></tr>`;
     }
 
@@ -222,7 +258,6 @@ class PedidosSystem {
         document.getElementById('ped-solicitado').value = Utils.obtenerFechaLocal();
         document.getElementById('ped-telefono').value = '';
 
-        // Bloque de adelanto
         const elAdelanto = document.getElementById('ped-adelanto');
         const elMetodoAd = document.getElementById('ped-metodo-adelanto');
         if (elAdelanto) elAdelanto.value = '';
@@ -336,12 +371,10 @@ class PedidosSystem {
         }
     }
 
-    // AHORA PERMITE ABONAR INCLUSO EN PENDIENTES
     static async abonar(id) {
         const ped = Estado.pedidos.find(p => p.id === id); if (!ped) return;
 
         let pTot = ped.precio;
-        // Si el precio total es 0 o no se ha definido, lo pedimos para calcular la deuda
         if (!pTot || pTot === 0) {
             const { value: nP } = await Swal.fire({ title: 'Fijar Precio Final', text: 'Antes de abonar, debes definir el precio total del pedido:', input: 'number', showCancelButton: true, inputValidator: v => (!v || v <= 0) ? 'Ingrese monto mayor a 0' : null });
             if (!nP) return; pTot = parseFloat(nP); await updateDoc(doc(db, "pedidos", id), { precio: pTot }); ped.precio = pTot;
@@ -512,33 +545,17 @@ class DashboardSystem {
                 const idUnico = (telLimpio !== '') ? telLimpio : p.cliente.trim().toUpperCase();
 
                 if (!cMap[idUnico]) {
-                    cMap[idUnico] = {
-                        nombreAMostrar: p.cliente.trim(),
-                        telefonoAMostrar: p.telefono || '',
-                        tc: 0,
-                        uc: '2000-01-01',
-                        cp: 0
-                    };
+                    cMap[idUnico] = { nombreAMostrar: p.cliente.trim(), telefonoAMostrar: p.telefono || '', tc: 0, uc: '2000-01-01', cp: 0 };
                 }
-                cMap[idUnico].tc += (p.precio || 0);
-                cMap[idUnico].cp += 1;
+                cMap[idUnico].tc += (p.precio || 0); cMap[idUnico].cp += 1;
                 if (p.fecha_solicitud > cMap[idUnico].uc) cMap[idUnico].uc = p.fecha_solicitud;
             }
         });
 
-        const tCli = Object.entries(cMap).sort((a, b) => b[1].tc - a[1].tc).slice(0, 5);
-        let html = '';
-
+        const tCli = Object.entries(cMap).sort((a, b) => b[1].tc - a[1].tc).slice(0, 5); let html = '';
         tCli.forEach((c, i) => {
-            const data = c[1];
-            const badgeTelefono = data.telefonoAMostrar ? ` - 📱 ${data.telefonoAMostrar}` : '';
-            html += `<li class="list-group-item d-flex justify-content-between align-items-start">
-                        <div class="ms-2 me-auto">
-                            <div class="fw-bold">${i + 1}. ${data.nombreAMostrar}${badgeTelefono}</div>
-                            <span class="small text-muted">Última compra: ${data.uc} (${data.cp} pedidos)</span>
-                        </div>
-                        <span class="badge bg-success rounded-pill">₡${data.tc.toLocaleString('es-CR')}</span>
-                     </li>`;
+            const data = c[1]; const badgeTelefono = data.telefonoAMostrar ? ` - 📱 ${data.telefonoAMostrar}` : '';
+            html += `<li class="list-group-item d-flex justify-content-between align-items-start"><div class="ms-2 me-auto"><div class="fw-bold">${i + 1}. ${data.nombreAMostrar}${badgeTelefono}</div><span class="small text-muted">Última compra: ${data.uc} (${data.cp} pedidos)</span></div><span class="badge bg-success rounded-pill">₡${data.tc.toLocaleString('es-CR')}</span></li>`;
         });
         document.getElementById('lista-crm-clientes').innerHTML = html || '<li class="list-group-item">Datos insuficientes.</li>';
     }
@@ -615,10 +632,7 @@ class DashboardSystem {
         if (window.chartGastos) window.chartGastos.destroy();
         window.chartGastos = new Chart(document.getElementById('graficoGastos').getContext('2d'), {
             type: 'doughnut',
-            data: {
-                labels: Object.keys(gastos),
-                datasets: [{ data: Object.values(gastos), backgroundColor: ['#0dcaf0', '#fd7e14', '#ffc107', '#6c757d'] }]
-            },
+            data: { labels: Object.keys(gastos), datasets: [{ data: Object.values(gastos), backgroundColor: ['#0dcaf0', '#fd7e14', '#ffc107', '#6c757d'] }] },
             options: { responsive: true, maintainAspectRatio: false }
         });
     }
@@ -631,38 +645,31 @@ class App {
     static init() {
         UIManager.init();
 
-        // Listeners de Formularios UI
         document.getElementById('form-pedido').addEventListener('submit', PedidosSystem.guardar);
         document.getElementById('form-movimiento').addEventListener('submit', FinanzasSystem.registrarManual);
         document.getElementById('form-editar-mov').addEventListener('submit', FinanzasSystem.guardarEdicion);
 
-        // Listeners de Exportaciones
         document.getElementById('btn-export-pdf').addEventListener('click', () => this.exportar('pdf'));
         document.getElementById('btn-export-excel').addEventListener('click', () => this.exportar('excel'));
 
-        // Filtros
         ['filtro-pedido-texto', 'filtro-pedido-solicitud', 'filtro-pedido-entrega'].forEach(id => document.getElementById(id).addEventListener('input', () => PedidosSystem.renderizarPendientes()));
         document.getElementById('btn-limpiar-pedidos').addEventListener('click', () => { ['filtro-pedido-texto', 'filtro-pedido-solicitud', 'filtro-pedido-entrega'].forEach(id => document.getElementById(id).value = ''); PedidosSystem.renderizarPendientes(); });
         document.getElementById('filtro-historial').addEventListener('change', () => PedidosSystem.renderizarHistorial());
         ['filtro-modo', 'filtro-inicio', 'filtro-fin'].forEach(id => document.getElementById(id).addEventListener('input', () => FinanzasSystem.renderizarReporte()));
 
-        // MOTOR DE LA AGENDA DE CONTACTOS
         const btnContactos = document.getElementById('btn-contactos');
         if (btnContactos) {
-            // Verificamos si el celular soporta esta tecnología tan nueva
             if ('contacts' in navigator && 'ContactsManager' in window) {
                 btnContactos.addEventListener('click', async () => {
                     try {
                         const contactosAgarrados = await navigator.contacts.select(['name', 'tel'], { multiple: false });
                         if (contactosAgarrados.length > 0) {
                             const contacto = contactosAgarrados[0];
-                            // Llenar el teléfono (limpiando espacios y +506)
                             if (contacto.tel && contacto.tel.length > 0) {
                                 let num = contacto.tel[0].replace(/[\s-]/g, '');
                                 if (num.startsWith('+506')) num = num.substring(4);
                                 document.getElementById('ped-telefono').value = num;
                             }
-                            // Llenar el nombre si el campo estaba vacío
                             if (contacto.name && contacto.name.length > 0) {
                                 const inputNombre = document.getElementById('ped-cliente');
                                 if (!inputNombre.value) inputNombre.value = contacto.name[0];
@@ -670,17 +677,12 @@ class App {
                         }
                     } catch (ex) { console.log("Selección de contacto cancelada."); }
                 });
-            } else {
-                // Si está en PC o en un navegador viejo, ocultamos el botón para no confundir
-                btnContactos.style.display = 'none';
-            }
+            } else { btnContactos.style.display = 'none'; }
         }
 
-        // Auth Listeners
         document.getElementById('btn-login').addEventListener('click', () => signInWithPopup(auth, new GoogleAuthProvider()).catch(() => Swal.fire('Error', 'Fallo en login', 'error')));
         document.getElementById('btn-logout').addEventListener('click', async () => { if ((await Swal.fire({ title: '¿Salir?', icon: 'warning', showCancelButton: true })).isConfirmed) signOut(auth); });
 
-        // Vigilar Estado Auth
         onAuthStateChanged(auth, async (user) => {
             if (user && CORREOS_PERMITIDOS.includes(user.email)) {
                 document.getElementById('login-container').classList.add('d-none'); document.getElementById('app-container').classList.remove('d-none'); document.getElementById('app-container').classList.add('d-flex');
@@ -715,3 +717,5 @@ App.init();
 window.PedidosSystem = PedidosSystem;
 window.FinanzasSystem = FinanzasSystem;
 window.abrirModalPedido = () => PedidosSystem.abrirModal();
+// Exponer la función para cargar más elementos del historial
+window.cargarMasHistorial = () => { PedidosSystem.limiteHistorial += 50; PedidosSystem.renderizarHistorial(); };
