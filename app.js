@@ -553,10 +553,14 @@ class DashboardSystem {
         });
 
         const tCli = Object.entries(cMap).sort((a, b) => b[1].tc - a[1].tc).slice(0, 5); let html = '';
-        tCli.forEach((c, i) => {
-            const data = c[1]; const badgeTelefono = data.telefonoAMostrar ? ` - 📱 ${data.telefonoAMostrar}` : '';
-            html += `<li class="list-group-item d-flex justify-content-between align-items-start"><div class="ms-2 me-auto"><div class="fw-bold">${i + 1}. ${data.nombreAMostrar}${badgeTelefono}</div><span class="small text-muted">Última compra: ${data.uc} (${data.cp} pedidos)</span></div><span class="badge bg-success rounded-pill">₡${data.tc.toLocaleString('es-CR')}</span></li>`;
+
+        // ¡OJO AQUÍ! Quitamos la variable del índice y el número manual
+        tCli.forEach((c) => {
+            const data = c[1];
+            const badgeTelefono = data.telefonoAMostrar ? ` - 📱 ${data.telefonoAMostrar}` : '';
+            html += `<li class="list-group-item d-flex justify-content-between align-items-start"><div class="ms-2 me-auto"><div class="fw-bold">${data.nombreAMostrar}${badgeTelefono}</div><span class="small text-muted">Última compra: ${data.uc} (${data.cp} pedidos)</span></div><span class="badge bg-success rounded-pill">₡${data.tc.toLocaleString('es-CR')}</span></li>`;
         });
+
         document.getElementById('lista-crm-clientes').innerHTML = html || '<li class="list-group-item">Datos insuficientes.</li>';
     }
 
@@ -598,12 +602,33 @@ class DashboardSystem {
     static renderEstacionalidad() {
         const catMap = {};
         Estado.pedidos.filter(p => p.estado !== 'Cancelado' && p.producto).forEach(p => {
-            const n = p.producto.toLowerCase(); let cat = 'Otros Diseños';
-            if (n.includes('taza') || n.includes('vaso') || n.includes('mug')) cat = 'Tazas/Vasos';
-            else if (n.includes('camis') || n.includes('gorra') || n.includes('textil')) cat = 'Textiles';
-            else if (n.includes('sticker') || n.includes('vinil') || n.includes('corte')) cat = 'Vinil/Stickers';
+            const n = p.producto.toLowerCase();
+            let cat = 'Otros Diseños';
+
+            // 1. Ropa y Textiles
+            if (n.includes('pijama') || n.includes('camis') || n.includes('talla') || n.includes('short') || n.includes('juego') || n.includes('textil')) {
+                cat = 'Ropa y Textiles';
+            }
+            // 2. Llaveros y Placas
+            else if (n.includes('llavero') || n.includes('placa')) {
+                cat = 'Llaveros y Placas';
+            }
+            // 3. Regalos Especiales (Relicarios, Retablos, Rocas)
+            else if (n.includes('relicario') || n.includes('retablo') || n.includes('roca')) {
+                cat = 'Regalos Especiales';
+            }
+            // 4. Tazas y Vasos
+            else if (n.includes('taza') || n.includes('vaso') || n.includes('mug')) {
+                cat = 'Tazas y Vasos';
+            }
+            // 5. Vinil y Stickers
+            else if (n.includes('sticker') || n.includes('vinil') || n.includes('corte')) {
+                cat = 'Vinil y Stickers';
+            }
+
             catMap[cat] = (catMap[cat] || 0) + 1;
         });
+
         const data = Object.entries(catMap).sort((a, b) => b[1] - a[1]);
         if (window.chartEstacion) window.chartEstacion.destroy();
         window.chartEstacion = new Chart(document.getElementById('graficoEstacionalidad').getContext('2d'), {
