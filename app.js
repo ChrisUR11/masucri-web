@@ -3,7 +3,6 @@
 // ==========================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-// SE AGREGÓ: enableIndexedDbPersistence para el MODO OFFLINE
 import { getFirestore, enableIndexedDbPersistence, collection, addDoc, onSnapshot, query, orderBy, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
 // ==========================================
@@ -34,7 +33,7 @@ const Estado = {
     movimientos: [],
     pedidos: [],
     datosParaExportar: [],
-    modales: { pedido: null, editarMov: null }
+    modales: { pedido: null, editarMov: null, detalleHistorial: null } // Agregado nuevo modal
 };
 
 // ==========================================
@@ -129,7 +128,6 @@ class UIManager {
 // CLASE 3: SISTEMA DE PEDIDOS
 // ==========================================
 class PedidosSystem {
-    // Variable para controlar cuántos elementos del historial mostramos
     static limiteHistorial = 50;
 
     static init() {
@@ -137,22 +135,17 @@ class PedidosSystem {
             Estado.pedidos = [];
             snapshot.forEach(doc => Estado.pedidos.push({ id: doc.id, ...doc.data() }));
 
-            this.actualizarCatalogo(); // Rellena el autocompletado
+            this.actualizarCatalogo();
             this.renderizarPendientes();
             this.renderizarHistorial();
             if (UIManager.vistas.dashboard.classList.contains('active')) DashboardSystem.renderizar();
         }, (err) => { if (err.code === 'permission-denied') Swal.fire('Seguridad', 'Las reglas de Firebase bloquearon el acceso.', 'error'); });
     }
 
-    // EXTRAE LOS PRODUCTOS ÚNICOS PARA EL AUTOCOMPLETADO
     static actualizarCatalogo() {
         const listaHtml = document.getElementById('catalogo-productos');
         if (!listaHtml) return;
-
-        // Recolectamos todos los nombres de productos, quitamos repetidos y espacios vacíos
         const productosUnicos = [...new Set(Estado.pedidos.map(p => p.producto ? p.producto.trim() : ''))].filter(p => p !== '');
-
-        // Creamos las opciones del datalist
         listaHtml.innerHTML = productosUnicos.map(prod => `<option value="${prod}">`).join('');
     }
 
@@ -209,6 +202,9 @@ class PedidosSystem {
         tbody.innerHTML = html || '<tr><td colspan="6" class="text-center py-4">No hay pedidos pendientes.</td></tr>';
     }
 
+    // =====================================
+    // NUENVO: TABLA DE HISTORIAL SIMPLIFICADA
+    // =====================================
     static renderizarHistorial() {
         if (!UIManager.vistas.historial.classList.contains('active')) return;
 
@@ -220,7 +216,6 @@ class PedidosSystem {
         else if (filtro === 'anulados') historial = historial.filter(p => p.estado === 'Cancelado');
 
         const totalHistorial = historial.length;
-        // Cortamos el arreglo para mostrar solo el límite establecido (para que el DOM sea rápido)
         const historialCortado = historial.slice(0, this.limiteHistorial);
 
         const tbody = document.getElementById('tabla-historial');
@@ -228,28 +223,104 @@ class PedidosSystem {
 
         historialCortado.forEach(ped => {
             let bColor = ped.estado === 'Entregado' ? 'bg-success' : 'bg-danger';
-            let txtEst = ped.estado; const deuda = (ped.precio || 0) - (ped.monto_pagado || 0);
-            let txtPago = `Pagado: ₡${(ped.monto_pagado || 0).toLocaleString('es-CR')}`;
-            let btns = `<button class="btn btn-sm btn-outline-info" onclick="PedidosSystem.reimprimir('${ped.id}')">Enviar Ticket</button>`;
+            let txtEst = ped.estado;
+            const deuda = (ped.precio || 0) - (ped.monto_pagado || 0);
 
-            if (ped.estado === 'Entregado') {
-                if (deuda > 0) {
-                    bColor = 'bg-warning text-dark'; txtEst = 'Con Saldo';
-                    txtPago += `<br><small class="text-danger fw-bold">Debe: ₡${deuda.toLocaleString('es-CR')}</small>`;
-                    btns += `<button class="btn btn-sm btn-success" onclick="PedidosSystem.abonar('${ped.id}')">Abonar</button>`;
-                } else if (deuda < 0) {
-                    txtPago += `<br><small class="text-success fw-bold">+ Propina: ₡${Math.abs(deuda).toLocaleString('es-CR')}</small>`;
-                }
+            if (ped.estado === 'Entregado' && deuda > 0) {
+                bColor = 'bg-warning text-dark';
+                txtEst = 'Con Saldo';
             }
-            html += `<tr><td><span class="badge ${bColor}">${txtEst}</span></td><td>${ped.fecha_cierre}</td><td class="fw-bold">${ped.cliente}</td><td>${ped.producto}</td><td>${ped.estado === 'Cancelado' ? '-' : txtPago}</td><td class="text-center align-middle"><div class="d-flex justify-content-center gap-2">${btns}<button class="btn btn-sm btn-outline-danger" onclick="PedidosSystem.borrarHistorial('${ped.id}')">Eliminar</button></div></td></tr>`;
+
+            // Fila simplificada a 4 columnas
+            html += `<tr>
+                <td class="align-middle"><span class="badge ${bColor}">${txtEst}</span></td>
+                <td class="align-middle fw-bold">${ped.cliente}</td>
+                <td class="align-middle text-truncate" style="max-width: 120px;">${ped.producto}</td>
+                <td class="align-middle text-center">
+                    <button class="btn btn-sm btn-primary rounded-pill px-3" onclick="PedidosSystem.abrirDetalleHistorial('${ped.id}')">
+                        <i class="fas fa-search"></i> Ver
+                    </button>
+                </td>
+            </tr>`;
         });
 
-        // BOTÓN DE CARGAR MÁS si quedan elementos ocultos
         if (totalHistorial > this.limiteHistorial) {
-            html += `<tr><td colspan="6" class="text-center py-3"><button class="btn btn-sm btn-secondary" onclick="window.cargarMasHistorial()">👇 Cargar más antiguos (${totalHistorial - this.limiteHistorial} restantes)</button></td></tr>`;
+            html += `<tr><td colspan="4" class="text-center py-3"><button class="btn btn-sm btn-secondary" onclick="window.cargarMasHistorial()">👇 Cargar más antiguos (${totalHistorial - this.limiteHistorial} restantes)</button></td></tr>`;
         }
 
-        tbody.innerHTML = html || `<tr><td colspan="6" class="text-center py-4 text-muted">No hay registros con la opción seleccionada.</td></tr>`;
+        tbody.innerHTML = html || `<tr><td colspan="4" class="text-center py-4 text-muted">No hay registros con la opción seleccionada.</td></tr>`;
+    }
+
+    // =====================================
+    // NUENVO: DETALLE DEL HISTORIAL (MODAL)
+    // =====================================
+    static abrirDetalleHistorial(id) {
+        const ped = Estado.pedidos.find(p => p.id === id);
+        if (!ped) return;
+
+        const deuda = (ped.precio || 0) - (ped.monto_pagado || 0);
+        let bColor = ped.estado === 'Entregado' ? 'success' : 'danger';
+        let txtEst = ped.estado;
+        if (ped.estado === 'Entregado' && deuda > 0) { bColor = 'warning text-dark'; txtEst = 'Con Saldo'; }
+
+        // Contrucción del Cuerpo de la Tarjeta
+        const bodyHtml = `
+            <div class="text-center mb-3">
+                <span class="badge bg-${bColor} fs-6 px-3 py-2">${txtEst}</span>
+                <p class="text-muted small mt-2 mb-0">Cerrado el: ${ped.fecha_cierre}</p>
+            </div>
+            <ul class="list-group list-group-flush border rounded">
+                <li class="list-group-item">
+                    <small class="text-muted d-block">Cliente</small>
+                    <span class="fw-bold fs-5">${ped.cliente}</span>
+                    ${ped.telefono ? `<br><small class="text-primary"><i class="fas fa-phone"></i> ${ped.telefono}</small>` : ''}
+                </li>
+                <li class="list-group-item">
+                    <small class="text-muted d-block">Producto</small>
+                    <span class="fw-bold">${ped.producto}</span>
+                </li>
+                <li class="list-group-item">
+                    <small class="text-muted d-block">Descripción / Notas</small>
+                    <span>${ped.descripcion || 'Sin descripción adicional.'}</span>
+                </li>
+                <li class="list-group-item bg-light">
+                    <div class="row text-center">
+                        <div class="col-6 border-end">
+                            <small class="text-muted d-block">Precio Total</small>
+                            <span class="fw-bold">₡${(ped.precio || 0).toLocaleString('es-CR')}</span>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted d-block">Pagado</small>
+                            <span class="fw-bold text-success">₡${(ped.monto_pagado || 0).toLocaleString('es-CR')}</span>
+                        </div>
+                    </div>
+                </li>
+                ${deuda > 0 ? `<li class="list-group-item text-center bg-warning text-dark fw-bold">Saldo Pendiente: ₡${deuda.toLocaleString('es-CR')}</li>` : ''}
+                ${deuda < 0 ? `<li class="list-group-item text-center bg-success text-white fw-bold">Propina a favor: ₡${Math.abs(deuda).toLocaleString('es-CR')}</li>` : ''}
+            </ul>
+        `;
+        document.getElementById('detalle-historial-body').innerHTML = bodyHtml;
+
+        // Construcción de los Botones
+        let footerHtml = `<button class="btn btn-outline-info" onclick="PedidosSystem.ejecutarAccionDetalle('reimprimir', '${ped.id}')"><i class="fas fa-receipt"></i> Ticket</button>`;
+        if (ped.estado === 'Entregado' && deuda > 0) {
+            footerHtml += `<button class="btn btn-success" onclick="PedidosSystem.ejecutarAccionDetalle('abonar', '${ped.id}')"><i class="fas fa-money-bill"></i> Abonar</button>`;
+        }
+        footerHtml += `<button class="btn btn-outline-danger" onclick="PedidosSystem.ejecutarAccionDetalle('borrar', '${ped.id}')"><i class="fas fa-trash"></i></button>`;
+
+        document.getElementById('detalle-historial-footer').innerHTML = footerHtml;
+
+        if (Estado.modales.detalleHistorial) Estado.modales.detalleHistorial.show();
+    }
+
+    // Oculta el modal de detalle suavemente antes de lanzar las alertas rojas o verdes
+    static ejecutarAccionDetalle(accion, id) {
+        if (Estado.modales.detalleHistorial) Estado.modales.detalleHistorial.hide();
+        setTimeout(() => {
+            if (accion === 'abonar') this.abonar(id);
+            else if (accion === 'reimprimir') this.reimprimir(id);
+            else if (accion === 'borrar') this.borrarHistorial(id);
+        }, 400); // 400ms para asegurar que la animación del modal terminó
     }
 
     static abrirModal(id = null) {
@@ -553,14 +624,11 @@ class DashboardSystem {
         });
 
         const tCli = Object.entries(cMap).sort((a, b) => b[1].tc - a[1].tc).slice(0, 5); let html = '';
-
-        // ¡OJO AQUÍ! Quitamos la variable del índice y el número manual
         tCli.forEach((c) => {
             const data = c[1];
             const badgeTelefono = data.telefonoAMostrar ? ` - 📱 ${data.telefonoAMostrar}` : '';
             html += `<li class="list-group-item d-flex justify-content-between align-items-start"><div class="ms-2 me-auto"><div class="fw-bold">${data.nombreAMostrar}${badgeTelefono}</div><span class="small text-muted">Última compra: ${data.uc} (${data.cp} pedidos)</span></div><span class="badge bg-success rounded-pill">₡${data.tc.toLocaleString('es-CR')}</span></li>`;
         });
-
         document.getElementById('lista-crm-clientes').innerHTML = html || '<li class="list-group-item">Datos insuficientes.</li>';
     }
 
@@ -604,31 +672,13 @@ class DashboardSystem {
         Estado.pedidos.filter(p => p.estado !== 'Cancelado' && p.producto).forEach(p => {
             const n = p.producto.toLowerCase();
             let cat = 'Otros Diseños';
-
-            // 1. Ropa y Textiles
-            if (n.includes('pijama') || n.includes('camis') || n.includes('talla') || n.includes('short') || n.includes('juego') || n.includes('textil')) {
-                cat = 'Ropa y Textiles';
-            }
-            // 2. Llaveros y Placas
-            else if (n.includes('llavero') || n.includes('placa')) {
-                cat = 'Llaveros y Placas';
-            }
-            // 3. Regalos Especiales (Relicarios, Retablos, Rocas)
-            else if (n.includes('relicario') || n.includes('retablo') || n.includes('roca')) {
-                cat = 'Regalos Especiales';
-            }
-            // 4. Tazas y Vasos
-            else if (n.includes('taza') || n.includes('vaso') || n.includes('mug')) {
-                cat = 'Tazas y Vasos';
-            }
-            // 5. Vinil y Stickers
-            else if (n.includes('sticker') || n.includes('vinil') || n.includes('corte')) {
-                cat = 'Vinil y Stickers';
-            }
-
+            if (n.includes('pijama') || n.includes('camis') || n.includes('talla') || n.includes('short') || n.includes('juego') || n.includes('textil')) { cat = 'Ropa y Textiles'; }
+            else if (n.includes('llavero') || n.includes('placa')) { cat = 'Llaveros y Placas'; }
+            else if (n.includes('relicario') || n.includes('retablo') || n.includes('roca')) { cat = 'Regalos Especiales'; }
+            else if (n.includes('taza') || n.includes('vaso') || n.includes('mug')) { cat = 'Tazas y Vasos'; }
+            else if (n.includes('sticker') || n.includes('vinil') || n.includes('corte')) { cat = 'Vinil y Stickers'; }
             catMap[cat] = (catMap[cat] || 0) + 1;
         });
-
         const data = Object.entries(catMap).sort((a, b) => b[1] - a[1]);
         if (window.chartEstacion) window.chartEstacion.destroy();
         window.chartEstacion = new Chart(document.getElementById('graficoEstacionalidad').getContext('2d'), {
@@ -639,47 +689,20 @@ class DashboardSystem {
     }
 
     static renderGastosAgrupados() {
-        // 1. Nuevas categorías a la medida de MASUCRI
-        let gastos = {
-            'Telas y Costura': 0,
-            'Suministros (Sublimación)': 0,
-            'Transporte': 0,
-            'Gastos Generales': 0
-        };
-
+        let gastos = { 'Telas y Costura': 0, 'Suministros (Sublimación)': 0, 'Transporte': 0, 'Gastos Generales': 0 };
         Estado.movimientos.filter(m => m.tipo === 'salida').forEach(m => {
-            // 2. Escaneamos TANTO la descripción como el proveedor (entidad)
             let desc = (m.descripcion || '').toLowerCase();
             let entidad = (m.entidad || '').toLowerCase();
             let textoUnido = desc + " " + entidad;
-
-            // 3. Reglas de búsqueda mejoradas
-            if (textoUnido.includes('tela') || textoUnido.includes('aracely') || textoUnido.includes('brush') || textoUnido.includes('hilo')) {
-                gastos['Telas y Costura'] += m.monto;
-            }
-            else if (textoUnido.includes('ubora') || textoUnido.includes('suministro') || textoUnido.includes('sublimación') || textoUnido.includes('sublimacion') || textoUnido.includes('tinta') || textoUnido.includes('papel') || textoUnido.includes('vinil')) {
-                gastos['Suministros (Sublimación)'] += m.monto;
-            }
-            else if (textoUnido.includes('pasaje') || textoUnido.includes('bus') || textoUnido.includes('uber') || textoUnido.includes('transporte') || textoUnido.includes('gasolina')) {
-                gastos['Transporte'] += m.monto;
-            }
-            else {
-                gastos['Gastos Generales'] += m.monto;
-            }
+            if (textoUnido.includes('tela') || textoUnido.includes('aracely') || textoUnido.includes('brush') || textoUnido.includes('hilo')) { gastos['Telas y Costura'] += m.monto; }
+            else if (textoUnido.includes('ubora') || textoUnido.includes('suministro') || textoUnido.includes('sublimación') || textoUnido.includes('sublimacion') || textoUnido.includes('tinta') || textoUnido.includes('papel') || textoUnido.includes('vinil')) { gastos['Suministros (Sublimación)'] += m.monto; }
+            else if (textoUnido.includes('pasaje') || textoUnido.includes('bus') || textoUnido.includes('uber') || textoUnido.includes('transporte') || textoUnido.includes('gasolina')) { gastos['Transporte'] += m.monto; }
+            else { gastos['Gastos Generales'] += m.monto; }
         });
-
-        // 4. Dibujar el gráfico con colores nuevos
         if (window.chartGastos) window.chartGastos.destroy();
         window.chartGastos = new Chart(document.getElementById('graficoGastos').getContext('2d'), {
             type: 'doughnut',
-            data: {
-                labels: Object.keys(gastos),
-                datasets: [{
-                    data: Object.values(gastos),
-                    // Colores: Rosado (Telas), Celeste (Sublimación), Naranja (Transporte), Gris (Otros)
-                    backgroundColor: ['#e83e8c', '#0dcaf0', '#fd7e14', '#6c757d']
-                }]
-            },
+            data: { labels: Object.keys(gastos), datasets: [{ data: Object.values(gastos), backgroundColor: ['#e83e8c', '#0dcaf0', '#fd7e14', '#6c757d'] }] },
             options: { responsive: true, maintainAspectRatio: false }
         });
     }
@@ -737,6 +760,8 @@ class App {
 
                 const mP = document.getElementById('modalPedido'); if (mP) Estado.modales.pedido = new bootstrap.Modal(mP);
                 const mM = document.getElementById('modalEditarMov'); if (mM) Estado.modales.editarMov = new bootstrap.Modal(mM);
+                // VINCULAR EL NUEVO MODAL
+                const mDH = document.getElementById('modalDetalleHistorial'); if (mDH) Estado.modales.detalleHistorial = new bootstrap.Modal(mDH);
 
                 PedidosSystem.init(); FinanzasSystem.init(); UIManager.cambiarVista('pedidos');
             } else if (user) { await signOut(auth); Swal.fire({ icon: 'error', title: 'Acceso Denegado' }); }
@@ -764,5 +789,4 @@ App.init();
 window.PedidosSystem = PedidosSystem;
 window.FinanzasSystem = FinanzasSystem;
 window.abrirModalPedido = () => PedidosSystem.abrirModal();
-// Exponer la función para cargar más elementos del historial
 window.cargarMasHistorial = () => { PedidosSystem.limiteHistorial += 50; PedidosSystem.renderizarHistorial(); };

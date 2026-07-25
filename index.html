@@ -225,14 +225,12 @@
                 <div class="card shadow-sm border-0">
                     <div class="card-body table-responsive p-0" style="max-height: 600px; overflow-y: auto;">
                         <table class="table table-hover align-middle m-0 text-nowrap">
-                            <thead class="table-light sticky-top shadow-sm">
+                            <thead class="table-light">
                                 <tr>
                                     <th>Estado</th>
-                                    <th>Fecha Cierre</th>
                                     <th>Cliente</th>
                                     <th>Producto</th>
-                                    <th>Monto Pagado / Deuda</th>
-                                    <th class="text-center">Acciones</th>
+                                    <th class="text-center">Acción</th>
                                 </tr>
                             </thead>
                             <tbody id="tabla-historial"></tbody>
@@ -524,7 +522,8 @@
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">Nombre del Cliente</label>
-                                <input type="text" id="ped-cliente" class="form-control" required placeholder="Ej: Juan Pérez">
+                                <input type="text" id="ped-cliente" class="form-control" required
+                                    placeholder="Ej: Juan Pérez">
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">Teléfono del Cliente (Opcional)</label>
@@ -547,12 +546,13 @@
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">Descripción o Notas Adicionales</label>
-                                <textarea id="ped-desc" class="form-control" rows="2" placeholder="Ej: Talla M, color azul"></textarea>
+                                <textarea id="ped-desc" class="form-control" rows="2"
+                                    placeholder="Ej: Talla M, color azul"></textarea>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label fw-bold">Precio Total (Opcional)</label>
-                                <input type="number" id="ped-precio" class="form-control bg-light" min="0" step="0.01" 
-                                placeholder="Ej: 15000">
+                                <input type="number" id="ped-precio" class="form-control bg-light" min="0" step="0.01"
+                                    placeholder="Ej: 15000">
                             </div>
                             <!-- Sección de Adelanto (NUEVO) -->
                             <div class="row mb-3 p-3 bg-light rounded border">
@@ -633,6 +633,25 @@
                                 <button type="submit" class="btn btn-primary w-100">Guardar Cambios</button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Detalle de Historial -->
+        <div class="modal fade" id="modalDetalleHistorial" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow">
+                    <div class="modal-header bg-light">
+                        <h5 class="modal-title fw-bold text-dark"><i class="fas fa-file-invoice"></i> Detalle del Pedido
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body" id="detalle-historial-body">
+                        <!-- Aquí el JS inyectará los detalles -->
+                    </div>
+                    <div class="modal-footer justify-content-center bg-light" id="detalle-historial-footer">
+                        <!-- Aquí el JS inyectará los botones -->
                     </div>
                 </div>
             </div>
