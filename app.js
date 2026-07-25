@@ -639,25 +639,47 @@ class DashboardSystem {
     }
 
     static renderGastosAgrupados() {
-        let gastos = { 'Materiales/Insumos': 0, 'Transporte': 0, 'Comida': 0, 'Gastos Generales': 0 };
+        // 1. Nuevas categorías a la medida de MASUCRI
+        let gastos = {
+            'Telas y Costura': 0,
+            'Suministros (Sublimación)': 0,
+            'Transporte': 0,
+            'Gastos Generales': 0
+        };
 
         Estado.movimientos.filter(m => m.tipo === 'salida').forEach(m => {
-            let desc = m.descripcion.toLowerCase();
-            if (desc.includes('ubora') || desc.includes('suministro') || desc.includes('material') || desc.includes('vinil') || desc.includes('tinta') || desc.includes('papel') || desc.includes('blanco')) {
-                gastos['Materiales/Insumos'] += m.monto;
-            } else if (desc.includes('pasaje') || desc.includes('bus') || desc.includes('uber') || desc.includes('transporte') || desc.includes('gasolina')) {
+            // 2. Escaneamos TANTO la descripción como el proveedor (entidad)
+            let desc = (m.descripcion || '').toLowerCase();
+            let entidad = (m.entidad || '').toLowerCase();
+            let textoUnido = desc + " " + entidad;
+
+            // 3. Reglas de búsqueda mejoradas
+            if (textoUnido.includes('tela') || textoUnido.includes('aracely') || textoUnido.includes('brush') || textoUnido.includes('hilo')) {
+                gastos['Telas y Costura'] += m.monto;
+            }
+            else if (textoUnido.includes('ubora') || textoUnido.includes('suministro') || textoUnido.includes('sublimación') || textoUnido.includes('sublimacion') || textoUnido.includes('tinta') || textoUnido.includes('papel') || textoUnido.includes('vinil')) {
+                gastos['Suministros (Sublimación)'] += m.monto;
+            }
+            else if (textoUnido.includes('pasaje') || textoUnido.includes('bus') || textoUnido.includes('uber') || textoUnido.includes('transporte') || textoUnido.includes('gasolina')) {
                 gastos['Transporte'] += m.monto;
-            } else if (desc.includes('comida') || desc.includes('almuerzo') || desc.includes('cena')) {
-                gastos['Comida'] += m.monto;
-            } else {
+            }
+            else {
                 gastos['Gastos Generales'] += m.monto;
             }
         });
 
+        // 4. Dibujar el gráfico con colores nuevos
         if (window.chartGastos) window.chartGastos.destroy();
         window.chartGastos = new Chart(document.getElementById('graficoGastos').getContext('2d'), {
             type: 'doughnut',
-            data: { labels: Object.keys(gastos), datasets: [{ data: Object.values(gastos), backgroundColor: ['#0dcaf0', '#fd7e14', '#ffc107', '#6c757d'] }] },
+            data: {
+                labels: Object.keys(gastos),
+                datasets: [{
+                    data: Object.values(gastos),
+                    // Colores: Rosado (Telas), Celeste (Sublimación), Naranja (Transporte), Gris (Otros)
+                    backgroundColor: ['#e83e8c', '#0dcaf0', '#fd7e14', '#6c757d']
+                }]
+            },
             options: { responsive: true, maintainAspectRatio: false }
         });
     }
