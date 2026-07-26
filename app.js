@@ -33,7 +33,7 @@ const Estado = {
     movimientos: [],
     pedidos: [],
     datosParaExportar: [],
-    modales: { pedido: null, editarMov: null, detalleHistorial: null } // Agregado nuevo modal
+    modales: { pedido: null, editarMov: null, detallePedido: null }
 };
 
 // ==========================================
@@ -134,7 +134,6 @@ class PedidosSystem {
         onSnapshot(query(collection(db, "pedidos"), orderBy("fecha_entrega", "asc")), (snapshot) => {
             Estado.pedidos = [];
             snapshot.forEach(doc => Estado.pedidos.push({ id: doc.id, ...doc.data() }));
-
             this.actualizarCatalogo();
             this.renderizarPendientes();
             this.renderizarHistorial();
@@ -149,6 +148,7 @@ class PedidosSystem {
         listaHtml.innerHTML = productosUnicos.map(prod => `<option value="${prod}">`).join('');
     }
 
+    // TABLA PENDIENTES (MAESTRO)
     static renderizarPendientes() {
         if (!UIManager.vistas.pedidos.classList.contains('active')) return;
         let pendientes = Estado.pedidos.filter(p => p.estado === 'Pendiente');
@@ -176,35 +176,18 @@ class PedidosSystem {
                 else { bClass = 'bg-success'; txtPrio = 'Baja'; }
             }
 
-            let txtPrecio = ped.precio > 0 ? `₡${ped.precio.toLocaleString('es-CR')}` : '<span class="text-warning">Pendiente</span>';
-            if (ped.monto_pagado > 0) {
-                txtPrecio += `<br><small class="text-success fw-bold">Abonó: ₡${ped.monto_pagado.toLocaleString('es-CR')}</small>`;
-            }
-
-            const infoTelefono = ped.telefono ? `<br><small class="text-muted">📱 ${ped.telefono}</small>` : '';
-
             html += `<tr>
-                <td><span class="badge ${bClass} w-100 py-2">${txtPrio}</span></td>
-                <td class="small"><span class="text-muted d-block">Sol: ${ped.fecha_solicitud}</span><strong class="text-dark d-block">Ent: ${ped.fecha_entrega || 'Pendiente'}</strong></td>
-                <td class="fw-bold">${ped.cliente}${infoTelefono}</td>
-                <td>${ped.producto} <br><small class="text-muted">${ped.descripcion || ''}</small></td>
-                <td class="fw-bold">${txtPrecio}</td>
-                <td class="text-center align-middle">
-                    <div class="d-flex justify-content-center gap-1">
-                        <button class="btn btn-sm btn-outline-success" onclick="PedidosSystem.entregar('${ped.id}')">Entregar</button>
-                        <button class="btn btn-sm btn-outline-primary" onclick="PedidosSystem.abonar('${ped.id}')">Abonar</button>
-                        <button class="btn btn-sm btn-outline-secondary" onclick="PedidosSystem.abrirModal('${ped.id}')">Editar</button>
-                        <button class="btn btn-sm btn-outline-danger" onclick="PedidosSystem.cancelar('${ped.id}')">Anular</button>
-                    </div>
-                </td>
+                <td class="align-middle"><span class="badge ${bClass} w-100">${txtPrio}</span></td>
+                <td class="align-middle small"><span class="text-muted d-block">S: ${ped.fecha_solicitud}</span><strong class="d-block">E: ${ped.fecha_entrega || 'N/A'}</strong></td>
+                <td class="align-middle fw-bold">${ped.cliente}</td>
+                <td class="align-middle text-truncate" style="max-width: 100px;">${ped.producto}</td>
+                <td class="align-middle text-center"><button class="btn btn-sm btn-primary rounded-pill px-3" onclick="PedidosSystem.abrirDetallePedido('${ped.id}')"><i class="fas fa-search"></i> Ver</button></td>
             </tr>`;
         });
-        tbody.innerHTML = html || '<tr><td colspan="6" class="text-center py-4">No hay pedidos pendientes.</td></tr>';
+        tbody.innerHTML = html || '<tr><td colspan="5" class="text-center py-4">No hay pedidos pendientes.</td></tr>';
     }
 
-    // =====================================
-    // NUENVO: TABLA DE HISTORIAL SIMPLIFICADA
-    // =====================================
+    // TABLA HISTORIAL (MAESTRO)
     static renderizarHistorial() {
         if (!UIManager.vistas.historial.classList.contains('active')) return;
 
@@ -231,13 +214,12 @@ class PedidosSystem {
                 txtEst = 'Con Saldo';
             }
 
-            // Fila simplificada a 4 columnas
             html += `<tr>
                 <td class="align-middle"><span class="badge ${bColor}">${txtEst}</span></td>
                 <td class="align-middle fw-bold">${ped.cliente}</td>
                 <td class="align-middle text-truncate" style="max-width: 120px;">${ped.producto}</td>
                 <td class="align-middle text-center">
-                    <button class="btn btn-sm btn-primary rounded-pill px-3" onclick="PedidosSystem.abrirDetalleHistorial('${ped.id}')">
+                    <button class="btn btn-sm btn-primary rounded-pill px-3" onclick="PedidosSystem.abrirDetallePedido('${ped.id}')">
                         <i class="fas fa-search"></i> Ver
                     </button>
                 </td>
@@ -247,80 +229,103 @@ class PedidosSystem {
         if (totalHistorial > this.limiteHistorial) {
             html += `<tr><td colspan="4" class="text-center py-3"><button class="btn btn-sm btn-secondary" onclick="window.cargarMasHistorial()">👇 Cargar más antiguos (${totalHistorial - this.limiteHistorial} restantes)</button></td></tr>`;
         }
-
         tbody.innerHTML = html || `<tr><td colspan="4" class="text-center py-4 text-muted">No hay registros con la opción seleccionada.</td></tr>`;
     }
 
-    // =====================================
-    // NUENVO: DETALLE DEL HISTORIAL (MODAL)
-    // =====================================
-    static abrirDetalleHistorial(id) {
-        const ped = Estado.pedidos.find(p => p.id === id);
-        if (!ped) return;
+    // MODAL UNIFICADO (DETALLE)
+    static abrirDetallePedido(id) {
+        const ped = Estado.pedidos.find(p => p.id === id); if (!ped) return;
 
         const deuda = (ped.precio || 0) - (ped.monto_pagado || 0);
-        let bColor = ped.estado === 'Entregado' ? 'success' : 'danger';
-        let txtEst = ped.estado;
-        if (ped.estado === 'Entregado' && deuda > 0) { bColor = 'warning text-dark'; txtEst = 'Con Saldo'; }
+        let bColor = 'secondary'; let txtEst = ped.estado;
+        if (ped.estado === 'Pendiente') bColor = 'primary';
+        else if (ped.estado === 'Entregado' && deuda <= 0) bColor = 'success';
+        else if (ped.estado === 'Entregado' && deuda > 0) { bColor = 'warning text-dark'; txtEst = 'Entregado - Con Saldo'; }
+        else if (ped.estado === 'Cancelado') bColor = 'danger';
 
-        // Contrucción del Cuerpo de la Tarjeta
+        // Procesar Historial de Pagos
+        let pagosHtml = '';
+        let histPagos = ped.historial_pagos || [];
+
+        // Parche de retrocompatibilidad para pedidos viejos sin array de pagos
+        if (histPagos.length === 0 && (ped.monto_pagado || 0) > 0) {
+            histPagos = [{ fecha: ped.fecha_solicitud || 'Inicial', monto: ped.monto_pagado, metodo: ped.ultimo_metodo_pago || 'Desconocido' }];
+        }
+
+        if (histPagos.length > 0) {
+            pagosHtml = `<li class="list-group-item bg-light"><small class="fw-bold d-block mb-2 text-primary"><i class="fas fa-history"></i> Historial de Pagos</small>`;
+            histPagos.forEach((p, idx) => {
+                pagosHtml += `<div class="d-flex justify-content-between small border-bottom pb-1 mb-1">
+                    <span>${idx + 1}. ${p.fecha} <span class="badge bg-secondary ms-1">${p.metodo}</span></span>
+                    <span class="text-success fw-bold">₡${p.monto.toLocaleString('es-CR')}</span>
+                </div>`;
+            });
+            pagosHtml += `</li>`;
+        }
+
+        // Construir el HTML del Cuerpo
         const bodyHtml = `
-            <div class="text-center mb-3">
+            <div class="text-center py-3 bg-light border-bottom">
                 <span class="badge bg-${bColor} fs-6 px-3 py-2">${txtEst}</span>
-                <p class="text-muted small mt-2 mb-0">Cerrado el: ${ped.fecha_cierre}</p>
+                ${ped.fecha_cierre ? `<p class="text-muted small mt-2 mb-0">Cerrado el: ${ped.fecha_cierre}</p>` : `<p class="text-muted small mt-2 mb-0">Entrega pautada: <strong>${ped.fecha_entrega || 'Sin fecha'}</strong></p>`}
             </div>
-            <ul class="list-group list-group-flush border rounded">
+            <ul class="list-group list-group-flush">
                 <li class="list-group-item">
                     <small class="text-muted d-block">Cliente</small>
                     <span class="fw-bold fs-5">${ped.cliente}</span>
-                    ${ped.telefono ? `<br><small class="text-primary"><i class="fas fa-phone"></i> ${ped.telefono}</small>` : ''}
+                    ${ped.telefono ? `<div class="mt-1"><a href="tel:${ped.telefono}" class="badge bg-success text-decoration-none fs-6"><i class="fas fa-phone"></i> ${ped.telefono}</a></div>` : ''}
                 </li>
                 <li class="list-group-item">
                     <small class="text-muted d-block">Producto</small>
                     <span class="fw-bold">${ped.producto}</span>
+                    ${ped.descripcion ? `<p class="small text-muted mt-1 mb-0">${ped.descripcion}</p>` : ''}
                 </li>
                 <li class="list-group-item">
-                    <small class="text-muted d-block">Descripción / Notas</small>
-                    <span>${ped.descripcion || 'Sin descripción adicional.'}</span>
-                </li>
-                <li class="list-group-item bg-light">
                     <div class="row text-center">
                         <div class="col-6 border-end">
                             <small class="text-muted d-block">Precio Total</small>
                             <span class="fw-bold">₡${(ped.precio || 0).toLocaleString('es-CR')}</span>
                         </div>
                         <div class="col-6">
-                            <small class="text-muted d-block">Pagado</small>
+                            <small class="text-muted d-block">Total Pagado</small>
                             <span class="fw-bold text-success">₡${(ped.monto_pagado || 0).toLocaleString('es-CR')}</span>
                         </div>
                     </div>
                 </li>
-                ${deuda > 0 ? `<li class="list-group-item text-center bg-warning text-dark fw-bold">Saldo Pendiente: ₡${deuda.toLocaleString('es-CR')}</li>` : ''}
+                ${pagosHtml}
+                ${deuda > 0 ? `<li class="list-group-item text-center bg-warning text-dark fw-bold fs-5">Debe: ₡${deuda.toLocaleString('es-CR')}</li>` : ''}
                 ${deuda < 0 ? `<li class="list-group-item text-center bg-success text-white fw-bold">Propina a favor: ₡${Math.abs(deuda).toLocaleString('es-CR')}</li>` : ''}
             </ul>
         `;
-        document.getElementById('detalle-historial-body').innerHTML = bodyHtml;
+        document.getElementById('detalle-pedido-body').innerHTML = bodyHtml;
 
-        // Construcción de los Botones
-        let footerHtml = `<button class="btn btn-outline-info" onclick="PedidosSystem.ejecutarAccionDetalle('reimprimir', '${ped.id}')"><i class="fas fa-receipt"></i> Ticket</button>`;
-        if (ped.estado === 'Entregado' && deuda > 0) {
-            footerHtml += `<button class="btn btn-success" onclick="PedidosSystem.ejecutarAccionDetalle('abonar', '${ped.id}')"><i class="fas fa-money-bill"></i> Abonar</button>`;
+        // Construir Botones según Estado
+        let footerHtml = '';
+        if (ped.estado === 'Pendiente') {
+            footerHtml += `<button class="btn btn-success" onclick="PedidosSystem.ejecutarAccionDetalle('entregar', '${ped.id}')"><i class="fas fa-check-circle"></i> Entregar</button>`;
+            if (deuda > 0 || !ped.precio) footerHtml += `<button class="btn btn-primary" onclick="PedidosSystem.ejecutarAccionDetalle('abonar', '${ped.id}')"><i class="fas fa-coins"></i> Abonar</button>`;
+            footerHtml += `<button class="btn btn-outline-secondary" onclick="PedidosSystem.ejecutarAccionDetalle('editar', '${ped.id}')"><i class="fas fa-pen"></i></button>`;
+            footerHtml += `<button class="btn btn-outline-danger" onclick="PedidosSystem.ejecutarAccionDetalle('cancelar', '${ped.id}')"><i class="fas fa-times"></i> Anular</button>`;
+        } else {
+            footerHtml += `<button class="btn btn-outline-info" onclick="PedidosSystem.ejecutarAccionDetalle('reimprimir', '${ped.id}')"><i class="fas fa-receipt"></i> Ticket</button>`;
+            if (ped.estado === 'Entregado' && deuda > 0) footerHtml += `<button class="btn btn-success" onclick="PedidosSystem.ejecutarAccionDetalle('abonar', '${ped.id}')"><i class="fas fa-coins"></i> Abonar</button>`;
+            footerHtml += `<button class="btn btn-outline-danger" onclick="PedidosSystem.ejecutarAccionDetalle('borrar', '${ped.id}')"><i class="fas fa-trash"></i> Borrar</button>`;
         }
-        footerHtml += `<button class="btn btn-outline-danger" onclick="PedidosSystem.ejecutarAccionDetalle('borrar', '${ped.id}')"><i class="fas fa-trash"></i></button>`;
+        document.getElementById('detalle-pedido-footer').innerHTML = footerHtml;
 
-        document.getElementById('detalle-historial-footer').innerHTML = footerHtml;
-
-        if (Estado.modales.detalleHistorial) Estado.modales.detalleHistorial.show();
+        if (Estado.modales.detallePedido) Estado.modales.detallePedido.show();
     }
 
-    // Oculta el modal de detalle suavemente antes de lanzar las alertas rojas o verdes
     static ejecutarAccionDetalle(accion, id) {
-        if (Estado.modales.detalleHistorial) Estado.modales.detalleHistorial.hide();
+        if (Estado.modales.detallePedido) Estado.modales.detallePedido.hide();
         setTimeout(() => {
-            if (accion === 'abonar') this.abonar(id);
+            if (accion === 'entregar') this.entregar(id);
+            else if (accion === 'abonar') this.abonar(id);
+            else if (accion === 'editar') this.abrirModal(id);
+            else if (accion === 'cancelar') this.cancelar(id);
             else if (accion === 'reimprimir') this.reimprimir(id);
             else if (accion === 'borrar') this.borrarHistorial(id);
-        }, 400); // 400ms para asegurar que la animación del modal terminó
+        }, 400);
     }
 
     static abrirModal(id = null) {
@@ -386,7 +391,11 @@ class PedidosSystem {
             } else {
                 datos.estado = 'Pendiente';
                 datos.monto_pagado = adelanto;
-                if (adelanto > 0) datos.ultimo_metodo_pago = metodoAdelanto;
+                datos.historial_pagos = []; // Inicializamos el array de pagos
+                if (adelanto > 0) {
+                    datos.ultimo_metodo_pago = metodoAdelanto;
+                    datos.historial_pagos.push({ fecha: Utils.obtenerFechaLocal(), monto: adelanto, metodo: metodoAdelanto });
+                }
                 datos.timestamp = new Date();
                 await addDoc(collection(db, "pedidos"), datos);
 
@@ -430,8 +439,12 @@ class PedidosSystem {
             const totalPagadoHistorico = (ped.monto_pagado || 0) + cobradoHoy;
             const saldoFinalDeuda = pTot - totalPagadoHistorico;
 
+            let arrPagos = ped.historial_pagos || [];
+            if (arrPagos.length === 0 && (ped.monto_pagado || 0) > 0) arrPagos.push({ fecha: ped.fecha_solicitud, monto: ped.monto_pagado, metodo: 'Anterior' });
+            if (cobradoHoy > 0) arrPagos.push({ fecha: hoy, monto: cobradoHoy, metodo: metodo });
+
             try {
-                await updateDoc(doc(db, "pedidos", id), { estado: 'Entregado', monto_pagado: totalPagadoHistorico, fecha_cierre: hoy, ultimo_metodo_pago: metodo });
+                await updateDoc(doc(db, "pedidos", id), { estado: 'Entregado', monto_pagado: totalPagadoHistorico, fecha_cierre: hoy, ultimo_metodo_pago: metodo, historial_pagos: arrPagos });
 
                 if (cobradoHoy > 0) FinanzasSystem.registrarDesdePedido(metodo, hoy, `Pago final de pedido: ${ped.producto}`, ped.cliente, cobradoHoy);
 
@@ -465,10 +478,15 @@ class PedidosSystem {
             }
         });
         if (r.isConfirmed) {
-            const { m, met } = r.value; const nPagado = (ped.monto_pagado || 0) + m; const saldo = pTot - nPagado;
+            const { m, met } = r.value; const nPagado = (ped.monto_pagado || 0) + m; const saldo = pTot - nPagado; const hoy = Utils.obtenerFechaLocal();
+
+            let arrPagos = ped.historial_pagos || [];
+            if (arrPagos.length === 0 && (ped.monto_pagado || 0) > 0) arrPagos.push({ fecha: ped.fecha_solicitud, monto: ped.monto_pagado, metodo: 'Anterior' });
+            arrPagos.push({ fecha: hoy, monto: m, metodo: met });
+
             try {
-                await updateDoc(doc(db, "pedidos", id), { monto_pagado: nPagado, ultimo_metodo_pago: met });
-                FinanzasSystem.registrarDesdePedido(met, Utils.obtenerFechaLocal(), `Abono a deuda: ${ped.producto}`, ped.cliente, m);
+                await updateDoc(doc(db, "pedidos", id), { monto_pagado: nPagado, ultimo_metodo_pago: met, historial_pagos: arrPagos });
+                FinanzasSystem.registrarDesdePedido(met, hoy, `Abono a deuda: ${ped.producto}`, ped.cliente, m);
                 if ((await Swal.fire({ title: 'Abono registrado', icon: 'success', showCancelButton: true, confirmButtonText: 'Ticket' })).isConfirmed) {
                     TicketSystem.generar(ped.id.slice(-5).toUpperCase(), ped.cliente, ped.producto, pTot, dAnt, m, Math.max(0, saldo), saldo <= 0 ? 'CANCELADO' : 'ABONO', met);
                 }
@@ -562,13 +580,16 @@ class FinanzasSystem {
         } catch (e) { Swal.fire('Error', 'Fallo al actualizar.', 'error'); }
     }
 
-    static async borrarMov(id) { if ((await Swal.fire({ title: '¿Eliminar movimiento?', text: 'Altera el balance de caja.', icon: 'warning', showCancelButton: true })).isConfirmed) await deleteDoc(doc(db, "movimientos", id)); }
+    static async borrarMov(id) {
+        if ((await Swal.fire({ title: '¿Eliminar movimiento?', text: 'Altera el balance de caja.', icon: 'warning', showCancelButton: true })).isConfirmed) await deleteDoc(doc(db, "movimientos", id));
+    }
 
     static dibujarGrafico(e, s, m) {
         if (window.graficoInstancia) window.graficoInstancia.destroy(); if (e === 0 && s === 0) return;
         let l = [], d = [], c = [];
         if (m === 'ambos') { l = ['Ingresos', 'Gastos']; d = [e, s]; c = ['#198754', '#dc3545']; }
-        else if (m === 'entradas') { l = ['Ingresos']; d = [e]; c = ['#198754']; } else { l = ['Gastos']; d = [s]; c = ['#dc3545']; }
+        else if (m === 'entradas') { l = ['Ingresos']; d = [e]; c = ['#198754']; }
+        else { l = ['Gastos']; d = [s]; c = ['#dc3545']; }
         window.graficoInstancia = new Chart(document.getElementById('miGrafico').getContext('2d'), { type: 'doughnut', data: { labels: l, datasets: [{ data: d, backgroundColor: c }] }, options: { responsive: true, maintainAspectRatio: false } });
     }
 }
@@ -585,6 +606,86 @@ class DashboardSystem {
         this.renderEstacionalidad();
         this.renderRetencion();
         this.renderGastosAgrupados();
+        this.renderMetricasAvanzadas(); // EL NUEVO MOTOR
+    }
+
+    static renderMetricasAvanzadas() {
+        const contenedor = document.getElementById('bi-metricas-avanzadas');
+        if (!contenedor) return;
+
+        let totalTrabajos = 0; let anulados = 0; let pagados100 = 0; let conDeuda = 0;
+        let deudores = [];
+        const pedidosPorMes = {};
+
+        Estado.pedidos.forEach(p => {
+            if (p.estado === 'Cancelado') { anulados++; }
+            else {
+                totalTrabajos++;
+
+                const mes = p.fecha_solicitud.substring(0, 7);
+                pedidosPorMes[mes] = (pedidosPorMes[mes] || 0) + 1;
+
+                const deuda = (p.precio || 0) - (p.monto_pagado || 0);
+                if (p.estado === 'Entregado') {
+                    if (deuda > 0) {
+                        conDeuda++;
+                        deudores.push({ cliente: p.cliente, telefono: p.telefono, debe: deuda });
+                    } else { pagados100++; }
+                }
+            }
+        });
+
+        const valoresMes = Object.values(pedidosPorMes);
+        let htmlEstadistica = `<p class="text-muted small">Insuficientes datos históricos.</p>`;
+        if (valoresMes.length > 0) {
+            const media = valoresMes.reduce((a, b) => a + b, 0) / valoresMes.length;
+            const varianza = valoresMes.reduce((acc, val) => acc + Math.pow(val - media, 2), 0) / valoresMes.length;
+            const desviacion = Math.sqrt(varianza);
+
+            htmlEstadistica = `
+                <div class="d-flex justify-content-between border-bottom pb-2 mb-2">
+                    <span class="text-muted">Promedio de Pedidos (Mes):</span>
+                    <strong class="text-primary">${media.toFixed(1)} pedidos</strong>
+                </div>
+                <div class="d-flex justify-content-between border-bottom pb-2 mb-2">
+                    <span class="text-muted">Desviación (Variabilidad):</span>
+                    <strong class="text-secondary">± ${desviacion.toFixed(1)} pedidos</strong>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span class="text-muted">Tasa de Cancelación:</span>
+                    <strong class="text-danger">${totalTrabajos > 0 ? ((anulados / (totalTrabajos + anulados)) * 100).toFixed(1) : 0}%</strong>
+                </div>`;
+        }
+
+        deudores.sort((a, b) => b.debe - a.debe);
+        let mayorDeudorHtml = `<div class="alert alert-success py-2 mb-0 text-center"><i class="fas fa-check-circle"></i> No hay deudas pendientes.</div>`;
+        if (deudores.length > 0) {
+            mayorDeudorHtml = `
+                <div class="alert alert-warning py-2 mb-0">
+                    <i class="fas fa-exclamation-triangle"></i> <strong>Mayor Deuda:</strong> ${deudores[0].cliente} 
+                    <br><span class="fs-5 fw-bold text-danger">₡${deudores[0].debe.toLocaleString('es-CR')}</span>
+                    ${deudores[0].telefono ? `<br><a href="tel:${deudores[0].telefono}" class="small text-dark text-decoration-none mt-1 d-inline-block"><i class="fas fa-phone"></i> Llamar / Cobrar</a>` : ''}
+                </div>`;
+        }
+
+        contenedor.innerHTML = `
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <h6 class="fw-bold"><i class="fas fa-chart-bar"></i> Volumen de Trabajo</h6>
+                    ${htmlEstadistica}
+                </div>
+                <div class="col-md-6">
+                    <h6 class="fw-bold"><i class="fas fa-hand-holding-usd"></i> Salud de Cobros (Entregados)</h6>
+                    <div class="d-flex justify-content-between mb-2 small">
+                        <span><i class="fas fa-circle text-success"></i> Pagados 100%:</span> <strong>${pagados100}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-3 small">
+                        <span><i class="fas fa-circle text-warning"></i> Con Saldo:</span> <strong>${conDeuda}</strong>
+                    </div>
+                    ${mayorDeudorHtml}
+                </div>
+            </div>
+        `;
     }
 
     static renderUtilidadNeta() {
@@ -658,7 +759,6 @@ class DashboardSystem {
             if (p.estado === 'Entregado') entregados++;
             else if (p.estado === 'Cancelado') cancelados++;
         });
-
         if (window.chartRetencion) window.chartRetencion.destroy();
         window.chartRetencion = new Chart(document.getElementById('graficoRetencion').getContext('2d'), {
             type: 'pie',
@@ -670,8 +770,7 @@ class DashboardSystem {
     static renderEstacionalidad() {
         const catMap = {};
         Estado.pedidos.filter(p => p.estado !== 'Cancelado' && p.producto).forEach(p => {
-            const n = p.producto.toLowerCase();
-            let cat = 'Otros Diseños';
+            const n = p.producto.toLowerCase(); let cat = 'Otros Diseños';
             if (n.includes('pijama') || n.includes('camis') || n.includes('talla') || n.includes('short') || n.includes('juego') || n.includes('textil')) { cat = 'Ropa y Textiles'; }
             else if (n.includes('llavero') || n.includes('placa')) { cat = 'Llaveros y Placas'; }
             else if (n.includes('relicario') || n.includes('retablo') || n.includes('roca')) { cat = 'Regalos Especiales'; }
@@ -760,8 +859,9 @@ class App {
 
                 const mP = document.getElementById('modalPedido'); if (mP) Estado.modales.pedido = new bootstrap.Modal(mP);
                 const mM = document.getElementById('modalEditarMov'); if (mM) Estado.modales.editarMov = new bootstrap.Modal(mM);
-                // VINCULAR EL NUEVO MODAL
-                const mDH = document.getElementById('modalDetalleHistorial'); if (mDH) Estado.modales.detalleHistorial = new bootstrap.Modal(mDH);
+
+                // VINCULAR EL NUEVO MODAL UNIFICADO
+                const mDP = document.getElementById('modalDetallePedido'); if (mDP) Estado.modales.detallePedido = new bootstrap.Modal(mDP);
 
                 PedidosSystem.init(); FinanzasSystem.init(); UIManager.cambiarVista('pedidos');
             } else if (user) { await signOut(auth); Swal.fire({ icon: 'error', title: 'Acceso Denegado' }); }

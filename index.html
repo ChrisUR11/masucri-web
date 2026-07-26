@@ -10,6 +10,7 @@
 
     <!-- Bootstrap 5 & Librerías -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11.10.6/dist/sweetalert2.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.10.6/dist/sweetalert2.all.min.js"></script>
@@ -194,14 +195,13 @@
                 <div class="card shadow-sm border-0">
                     <div class="card-body table-responsive p-0">
                         <table class="table table-hover align-middle m-0 text-nowrap">
-                            <thead class="table-dark sticky-top">
+                            <thead class="table-light">
                                 <tr>
-                                    <th>Prioridad</th>
+                                    <th>Prio.</th>
                                     <th>Fechas</th>
                                     <th>Cliente</th>
-                                    <th>Producto / Detalle</th>
-                                    <th>Precio</th>
-                                    <th class="text-center">Acciones</th>
+                                    <th>Producto</th>
+                                    <th class="text-center">Acción</th>
                                 </tr>
                             </thead>
                             <tbody id="tabla-pedidos"></tbody>
@@ -445,6 +445,16 @@
                     </div>
                 </div>
 
+                <!-- Módulo de Métricas Avanzadas (NUEVO) -->
+                <div class="col-12 mt-4 mb-4">
+                    <div class="card shadow-sm border-0">
+                        <div class="card-header bg-dark text-white fw-bold"><i class="fas fa-microscope"></i>
+                            Radiografía del Negocio</div>
+                        <div class="card-body" id="bi-metricas-avanzadas">
+                            <!-- El JS inyectará el análisis aquí -->
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -638,8 +648,8 @@
             </div>
         </div>
 
-        <!-- Modal Detalle de Historial -->
-        <div class="modal fade" id="modalDetalleHistorial" tabindex="-1">
+        <!-- Modal Detalle de Pedido Unificado -->
+        <div class="modal fade" id="modalDetallePedido" tabindex="-1">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content border-0 shadow">
                     <div class="modal-header bg-light">
@@ -647,11 +657,11 @@
                         </h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
-                    <div class="modal-body" id="detalle-historial-body">
-                        <!-- Aquí el JS inyectará los detalles -->
+                    <div class="modal-body p-0" id="detalle-pedido-body">
+                        <!-- JS inyecta el contenido -->
                     </div>
-                    <div class="modal-footer justify-content-center bg-light" id="detalle-historial-footer">
-                        <!-- Aquí el JS inyectará los botones -->
+                    <div class="modal-footer justify-content-center bg-light gap-2" id="detalle-pedido-footer">
+                        <!-- JS inyecta los botones según el estado -->
                     </div>
                 </div>
             </div>
