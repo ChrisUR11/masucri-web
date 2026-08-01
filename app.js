@@ -392,30 +392,35 @@ class PedidosSystem {
         `;
         document.getElementById('detalle-pedido-body').innerHTML = bodyHtml;
 
-        // --- BOTONES CON WHATSAPP ---
+        // --- CONSTRUCCIÓN DE BOTONES DEL MODAL ---
         let footerHtml = '';
         if (ped.estado === 'Pendiente') {
             footerHtml += `<button class="btn btn-primary" onclick="PedidosSystem.ejecutarAccionDetalle('entregar', '${ped.id}')"><i class="fas fa-check"></i> Entregar</button>`;
 
-            // Botón de Avisar por WhatsApp
+            /* --- INICIO WHATSAPP OCULTO TEMPORALMENTE ---
             if (ped.telefono) {
                 footerHtml += `<button class="btn text-white shadow-sm" style="background-color: #25D366;" onclick="PedidosSystem.enviarWhatsApp('${ped.id}', 'listo')" title="Avisar que está listo"><i class="fab fa-whatsapp"></i> Avisar</button>`;
             }
+            --- FIN WHATSAPP OCULTO --- */
 
-            if (deuda > 0 || !ped.precio) footerHtml += `<button class="btn btn-outline-primary" onclick="PedidosSystem.ejecutarAccionDetalle('abonar', '${ped.id}')"><i class="fas fa-coins"></i></button>`;
-            footerHtml += `<button class="btn btn-outline-secondary" onclick="PedidosSystem.ejecutarAccionDetalle('editar', '${ped.id}')"><i class="fas fa-pen"></i></button>`;
-            footerHtml += `<button class="btn btn-outline-danger" onclick="PedidosSystem.ejecutarAccionDetalle('cancelar', '${ped.id}')"><i class="fas fa-times"></i></button>`;
+            // Botones con su texto agregado
+            if (deuda > 0 || !ped.precio) footerHtml += `<button class="btn btn-outline-primary" onclick="PedidosSystem.ejecutarAccionDetalle('abonar', '${ped.id}')"><i class="fas fa-coins"></i> Abonar</button>`;
+
+            footerHtml += `<button class="btn btn-outline-secondary" onclick="PedidosSystem.ejecutarAccionDetalle('editar', '${ped.id}')"><i class="fas fa-pen"></i> Editar</button>`;
+            footerHtml += `<button class="btn btn-outline-danger" onclick="PedidosSystem.ejecutarAccionDetalle('cancelar', '${ped.id}')"><i class="fas fa-times"></i> Anular</button>`;
+
         } else {
             footerHtml += `<button class="btn btn-outline-info" onclick="PedidosSystem.ejecutarAccionDetalle('reimprimir', '${ped.id}')"><i class="fas fa-receipt"></i> Ticket</button>`;
             if (ped.estado === 'Entregado' && deuda > 0) {
                 footerHtml += `<button class="btn btn-success" onclick="PedidosSystem.ejecutarAccionDetalle('abonar', '${ped.id}')"><i class="fas fa-coins"></i> Abonar</button>`;
 
-                // Botón de Cobrar por WhatsApp
+                /* --- INICIO WHATSAPP OCULTO TEMPORALMENTE ---
                 if (ped.telefono) {
                     footerHtml += `<button class="btn text-white shadow-sm" style="background-color: #25D366;" onclick="PedidosSystem.enviarWhatsApp('${ped.id}', 'cobro')" title="Cobrar saldo por WhatsApp"><i class="fab fa-whatsapp"></i> Cobrar</button>`;
                 }
+                --- FIN WHATSAPP OCULTO --- */
             }
-            footerHtml += `<button class="btn btn-outline-danger" onclick="PedidosSystem.ejecutarAccionDetalle('borrar', '${ped.id}')"><i class="fas fa-trash"></i></button>`;
+            footerHtml += `<button class="btn btn-outline-danger" onclick="PedidosSystem.ejecutarAccionDetalle('borrar', '${ped.id}')"><i class="fas fa-trash"></i> Borrar</button>`;
         }
         document.getElementById('detalle-pedido-footer').innerHTML = footerHtml;
 
