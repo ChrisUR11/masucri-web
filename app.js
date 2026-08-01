@@ -125,11 +125,11 @@ class UIManager {
 }
 
 // ==========================================
-// CLASE 3: SISTEMA DE PEDIDOS
+// CLASE 3: SISTEMA DE PEDIDOS (CON WHATSAPP Y LEALTAD)
 // ==========================================
 class PedidosSystem {
     static limiteHistorial = 50;
-    static primeraCargaNotificaciones = true; // Control para no hacer spam de notificaciones
+    static primeraCargaNotificaciones = true;
 
     static init() {
         onSnapshot(query(collection(db, "pedidos"), orderBy("fecha_entrega", "asc")), (snapshot) => {
@@ -140,7 +140,6 @@ class PedidosSystem {
             this.renderizarHistorial();
             if (UIManager.vistas.dashboard.classList.contains('active')) DashboardSystem.renderizar();
 
-            // EJECUTAR ALERTAS SOLO LA PRIMERA VEZ QUE CARGA
             if (this.primeraCargaNotificaciones) {
                 this.analizarNotificaciones();
                 this.primeraCargaNotificaciones = false;
@@ -148,7 +147,7 @@ class PedidosSystem {
         }, (err) => { if (err.code === 'permission-denied') Swal.fire('Seguridad', 'Las reglas de Firebase bloquearon el acceso.', 'error'); });
     }
 
-    // NUEVO MOTOR DE NOTIFICACIONES
+    // --- ALERTAS DE INICIO ---
     static analizarNotificaciones() {
         const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
         let atrasados = 0; let paraHoy = 0;
@@ -163,26 +162,82 @@ class PedidosSystem {
 
         if (atrasados > 0 || paraHoy > 0) {
             const mensaje = `¡Hola! Tienes ${atrasados} pedido(s) atrasados y ${paraHoy} para entregar hoy.`;
-
-            // 1. Mostrar Toast no intrusivo en la esquina
             document.getElementById('toast-body-texto').textContent = mensaje;
-            const toastEl = document.getElementById('toast-notificacion');
-            const toast = new bootstrap.Toast(toastEl, { delay: 6000 }); // Dura 6 segundos y desaparece
-            toast.show();
+            new bootstrap.Toast(document.getElementById('toast-notificacion'), { delay: 6000 }).show();
 
-            // 2. Enviar Notificación Nativa al Celular (Push)
             if ("Notification" in window) {
                 if (Notification.permission === "granted") {
                     new Notification("Trabajos Pendientes ⚠️", { body: mensaje, icon: "logo-masucri.png" });
                 } else if (Notification.permission !== "denied") {
                     Notification.requestPermission().then(permission => {
-                        if (permission === "granted") {
-                            new Notification("Trabajos Pendientes ⚠️", { body: mensaje, icon: "logo-masucri.png" });
-                        }
+                        if (permission === "granted") new Notification("Trabajos Pendientes ⚠️", { body: mensaje, icon: "logo-masucri.png" });
                     });
                 }
             }
         }
+    }
+
+    // --- NUEVO: SISTEMA DE LEALTAD ---
+    static verificarLealtad() {
+        const tel = document.getElementById('ped-telefono').value.trim();
+        const nom = document.getElementById('ped-cliente').value.trim().toLowerCase();
+
+        // Si no ha escrito nada útil, no hacemos nada
+        if (tel.length < 4 && nom.length < 3) return;
+
+        let comprasHistoricas = 0;
+
+        Estado.pedidos.forEach(p => {
+            if (p.estado !== 'Cancelado') {
+                // Buscamos por teléfono (prioridad) o por nombre
+                if (tel && p.telefono && p.telefono.includes(tel)) {
+                    comprasHistoricas++;
+                } else if (!tel && nom && p.cliente && p.cliente.toLowerCase().includes(nom)) {
+                    comprasHistoricas++;
+                }
+            }
+        });
+
+        // Si es su compra número 3 o más
+        if (comprasHistoricas >= 3) {
+            const msj = `¡Cliente Estrella! ⭐ ${document.getElementById('ped-cliente').value || 'Esta persona'} lleva ${comprasHistoricas} compras registradas en MASUCRI. ¿Qué tal si le ofreces un descuento o una regalía? 🎁`;
+            document.getElementById('toast-body-texto').textContent = msj;
+
+            const toastEl = document.getElementById('toast-notificacion');
+            // Le ponemos un borde amarillo para que se vea diferente a una alerta normal
+            toastEl.classList.add('border-warning', 'border-2');
+            new bootstrap.Toast(toastEl, { delay: 6000 }).show();
+
+            // Quitamos el borde amarillo después para no afectar otras alertas
+            setTimeout(() => toastEl.classList.remove('border-warning', 'border-2'), 6000);
+        }
+    }
+
+    // --- NUEVO: ENVIAR WHATSAPP AUTOMÁTICO ---
+    static enviarWhatsApp(id, motivo) {
+        const ped = Estado.pedidos.find(p => p.id === id);
+        if (!ped || !ped.telefono) return;
+
+        // Limpiar el teléfono para que a WhatsApp le guste
+        let telLimpio = ped.telefono.replace(/[\s-]/g, '');
+        if (telLimpio.length === 8) {
+            telLimpio = '506' + telLimpio; // Código de Costa Rica por defecto
+        }
+
+        const deuda = (ped.precio || 0) - (ped.monto_pagado || 0);
+        let texto = '';
+
+        if (motivo === 'listo') {
+            texto = `¡Hola ${ped.cliente}! Te escribo de MASUCRI. 🎨 Te aviso que tu pedido de "${ped.producto}" ya está listo para retirar. 🎉`;
+            if (deuda > 0) texto += ` Queda un saldo pendiente de ₡${deuda.toLocaleString('es-CR')}.`;
+            texto += ` ¡Te esperamos!`;
+        } else if (motivo === 'cobro') {
+            texto = `¡Hola ${ped.cliente}! Te escribo de MASUCRI. 🎨 Te recuerdo que tienes un saldo pendiente de ₡${deuda.toLocaleString('es-CR')} por tu pedido de "${ped.producto}". ¿Te quedaría bien realizar el pago por Sinpe Móvil hoy?`;
+        }
+
+        // Abrir la app o la web de WhatsApp
+        const url = `https://wa.me/${telLimpio}?text=${encodeURIComponent(texto)}`;
+        window.open(url, '_blank');
     }
 
     static actualizarCatalogo() {
@@ -192,7 +247,6 @@ class PedidosSystem {
         listaHtml.innerHTML = productosUnicos.map(prod => `<option value="${prod}">`).join('');
     }
 
-    // TABLA PENDIENTES (MAESTRO)
     static renderizarPendientes() {
         if (!UIManager.vistas.pedidos.classList.contains('active')) return;
         let pendientes = Estado.pedidos.filter(p => p.estado === 'Pendiente');
@@ -231,7 +285,6 @@ class PedidosSystem {
         tbody.innerHTML = html || '<tr><td colspan="5" class="text-center py-4">No hay pedidos pendientes.</td></tr>';
     }
 
-    // TABLA HISTORIAL (MAESTRO)
     static renderizarHistorial() {
         if (!UIManager.vistas.historial.classList.contains('active')) return;
 
@@ -276,7 +329,6 @@ class PedidosSystem {
         tbody.innerHTML = html || `<tr><td colspan="4" class="text-center py-4 text-muted">No hay registros con la opción seleccionada.</td></tr>`;
     }
 
-    // MODAL UNIFICADO (DETALLE)
     static abrirDetallePedido(id) {
         const ped = Estado.pedidos.find(p => p.id === id); if (!ped) return;
 
@@ -287,11 +339,9 @@ class PedidosSystem {
         else if (ped.estado === 'Entregado' && deuda > 0) { bColor = 'warning text-dark'; txtEst = 'Entregado - Con Saldo'; }
         else if (ped.estado === 'Cancelado') bColor = 'danger';
 
-        // Procesar Historial de Pagos
         let pagosHtml = '';
         let histPagos = ped.historial_pagos || [];
 
-        // Parche de retrocompatibilidad para pedidos viejos sin array de pagos
         if (histPagos.length === 0 && (ped.monto_pagado || 0) > 0) {
             histPagos = [{ fecha: ped.fecha_solicitud || 'Inicial', monto: ped.monto_pagado, metodo: ped.ultimo_metodo_pago || 'Desconocido' }];
         }
@@ -307,7 +357,6 @@ class PedidosSystem {
             pagosHtml += `</li>`;
         }
 
-        // Construir el HTML del Cuerpo
         const bodyHtml = `
             <div class="text-center py-3 bg-light border-bottom">
                 <span class="badge bg-${bColor} fs-6 px-3 py-2">${txtEst}</span>
@@ -343,17 +392,30 @@ class PedidosSystem {
         `;
         document.getElementById('detalle-pedido-body').innerHTML = bodyHtml;
 
-        // Construir Botones según Estado
+        // --- BOTONES CON WHATSAPP ---
         let footerHtml = '';
         if (ped.estado === 'Pendiente') {
-            footerHtml += `<button class="btn btn-success" onclick="PedidosSystem.ejecutarAccionDetalle('entregar', '${ped.id}')"><i class="fas fa-check-circle"></i> Entregar</button>`;
-            if (deuda > 0 || !ped.precio) footerHtml += `<button class="btn btn-primary" onclick="PedidosSystem.ejecutarAccionDetalle('abonar', '${ped.id}')"><i class="fas fa-coins"></i> Abonar</button>`;
+            footerHtml += `<button class="btn btn-primary" onclick="PedidosSystem.ejecutarAccionDetalle('entregar', '${ped.id}')"><i class="fas fa-check"></i> Entregar</button>`;
+
+            // Botón de Avisar por WhatsApp
+            if (ped.telefono) {
+                footerHtml += `<button class="btn text-white shadow-sm" style="background-color: #25D366;" onclick="PedidosSystem.enviarWhatsApp('${ped.id}', 'listo')" title="Avisar que está listo"><i class="fab fa-whatsapp"></i> Avisar</button>`;
+            }
+
+            if (deuda > 0 || !ped.precio) footerHtml += `<button class="btn btn-outline-primary" onclick="PedidosSystem.ejecutarAccionDetalle('abonar', '${ped.id}')"><i class="fas fa-coins"></i></button>`;
             footerHtml += `<button class="btn btn-outline-secondary" onclick="PedidosSystem.ejecutarAccionDetalle('editar', '${ped.id}')"><i class="fas fa-pen"></i></button>`;
-            footerHtml += `<button class="btn btn-outline-danger" onclick="PedidosSystem.ejecutarAccionDetalle('cancelar', '${ped.id}')"><i class="fas fa-times"></i> Anular</button>`;
+            footerHtml += `<button class="btn btn-outline-danger" onclick="PedidosSystem.ejecutarAccionDetalle('cancelar', '${ped.id}')"><i class="fas fa-times"></i></button>`;
         } else {
             footerHtml += `<button class="btn btn-outline-info" onclick="PedidosSystem.ejecutarAccionDetalle('reimprimir', '${ped.id}')"><i class="fas fa-receipt"></i> Ticket</button>`;
-            if (ped.estado === 'Entregado' && deuda > 0) footerHtml += `<button class="btn btn-success" onclick="PedidosSystem.ejecutarAccionDetalle('abonar', '${ped.id}')"><i class="fas fa-coins"></i> Abonar</button>`;
-            footerHtml += `<button class="btn btn-outline-danger" onclick="PedidosSystem.ejecutarAccionDetalle('borrar', '${ped.id}')"><i class="fas fa-trash"></i> Borrar</button>`;
+            if (ped.estado === 'Entregado' && deuda > 0) {
+                footerHtml += `<button class="btn btn-success" onclick="PedidosSystem.ejecutarAccionDetalle('abonar', '${ped.id}')"><i class="fas fa-coins"></i> Abonar</button>`;
+
+                // Botón de Cobrar por WhatsApp
+                if (ped.telefono) {
+                    footerHtml += `<button class="btn text-white shadow-sm" style="background-color: #25D366;" onclick="PedidosSystem.enviarWhatsApp('${ped.id}', 'cobro')" title="Cobrar saldo por WhatsApp"><i class="fab fa-whatsapp"></i> Cobrar</button>`;
+                }
+            }
+            footerHtml += `<button class="btn btn-outline-danger" onclick="PedidosSystem.ejecutarAccionDetalle('borrar', '${ped.id}')"><i class="fas fa-trash"></i></button>`;
         }
         document.getElementById('detalle-pedido-footer').innerHTML = footerHtml;
 
@@ -435,7 +497,7 @@ class PedidosSystem {
             } else {
                 datos.estado = 'Pendiente';
                 datos.monto_pagado = adelanto;
-                datos.historial_pagos = []; // Inicializamos el array de pagos
+                datos.historial_pagos = [];
                 if (adelanto > 0) {
                     datos.ultimo_metodo_pago = metodoAdelanto;
                     datos.historial_pagos.push({ fecha: Utils.obtenerFechaLocal(), monto: adelanto, metodo: metodoAdelanto });
@@ -559,31 +621,26 @@ class PedidosSystem {
 // CLASE 4: SISTEMA DE FINANZAS
 // ==========================================
 class FinanzasSystem {
-    static limiteActual = 150;     // Empezamos cargando 150
-    static conexionFirebase = null; // Guardamos la conexión para poder reiniciarla
+    static limiteActual = 150;
+    static conexionFirebase = null;
 
     static init() {
         document.getElementById('fecha-mov').value = Utils.obtenerFechaLocal();
-        this.cargarDatos(); // Llamamos a la función que conecta con Firebase
+        this.cargarDatos();
 
-        // Evento para el botón "Cargar más"
         const btnCargarMas = document.getElementById('btn-cargar-mas-finanzas');
         if (btnCargarMas) {
             btnCargarMas.addEventListener('click', () => {
-                this.limiteActual += 150; // Sumamos 150 al límite
+                this.limiteActual += 150;
                 btnCargarMas.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Cargando...';
-                this.cargarDatos(); // Volvemos a pedir los datos
+                this.cargarDatos();
             });
         }
     }
 
     static cargarDatos() {
-        // Si ya estábamos conectados, desconectamos un microsegundo para actualizar el límite
-        if (this.conexionFirebase) {
-            this.conexionFirebase();
-        }
+        if (this.conexionFirebase) this.conexionFirebase();
 
-        // Hacemos la consulta con el límite dinámico
         this.conexionFirebase = onSnapshot(
             query(collection(db, "movimientos"), orderBy("fecha", "desc"), limit(this.limiteActual)),
             (snapshot) => {
@@ -593,11 +650,9 @@ class FinanzasSystem {
                 if (UIManager.vistas.reportes.classList.contains('active')) this.renderizarReporte();
                 if (UIManager.vistas.dashboard.classList.contains('active')) DashboardSystem.renderizar();
 
-                // Lógica del botón: Restaurar texto y ocultar si ya no hay más datos en la nube
                 const btnCargarMas = document.getElementById('btn-cargar-mas-finanzas');
                 if (btnCargarMas) {
                     btnCargarMas.innerHTML = '<i class="fas fa-arrow-down me-1"></i> Cargar más antiguos';
-                    // Si Firebase nos devolvió menos documentos que el límite, significa que ya topamos con el inicio de los tiempos
                     btnCargarMas.style.display = snapshot.docs.length < this.limiteActual ? 'none' : 'inline-block';
                 }
             }
@@ -686,7 +741,7 @@ class DashboardSystem {
         this.renderEstacionalidad();
         this.renderRetencion();
         this.renderGastosAgrupados();
-        this.renderMetricasAvanzadas(); // EL NUEVO MOTOR
+        this.renderMetricasAvanzadas();
     }
 
     static renderMetricasAvanzadas() {
@@ -903,6 +958,12 @@ class App {
             });
         }
 
+        // EVENTOS DEL NUEVO SISTEMA DE LEALTAD
+        const inputTel = document.getElementById('ped-telefono');
+        const inputNom = document.getElementById('ped-cliente');
+        if (inputTel) inputTel.addEventListener('change', () => PedidosSystem.verificarLealtad());
+        if (inputNom) inputNom.addEventListener('change', () => PedidosSystem.verificarLealtad());
+
         document.getElementById('form-pedido').addEventListener('submit', PedidosSystem.guardar);
         document.getElementById('form-movimiento').addEventListener('submit', FinanzasSystem.registrarManual);
         document.getElementById('form-editar-mov').addEventListener('submit', FinanzasSystem.guardarEdicion);
@@ -927,6 +988,7 @@ class App {
                                 let num = contacto.tel[0].replace(/[\s-]/g, '');
                                 if (num.startsWith('+506')) num = num.substring(4);
                                 document.getElementById('ped-telefono').value = num;
+                                PedidosSystem.verificarLealtad(); // Verificar lealtad si se usa la agenda
                             }
                             if (contacto.name && contacto.name.length > 0) {
                                 const inputNombre = document.getElementById('ped-cliente');
@@ -948,8 +1010,6 @@ class App {
 
                 const mP = document.getElementById('modalPedido'); if (mP) Estado.modales.pedido = new bootstrap.Modal(mP);
                 const mM = document.getElementById('modalEditarMov'); if (mM) Estado.modales.editarMov = new bootstrap.Modal(mM);
-
-                // VINCULAR EL NUEVO MODAL UNIFICADO
                 const mDP = document.getElementById('modalDetallePedido'); if (mDP) Estado.modales.detallePedido = new bootstrap.Modal(mDP);
 
                 PedidosSystem.init(); FinanzasSystem.init(); UIManager.cambiarVista('pedidos');
