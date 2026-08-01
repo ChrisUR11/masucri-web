@@ -3,7 +3,7 @@
 // ==========================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-import { getFirestore, enableIndexedDbPersistence, collection, addDoc, onSnapshot, query, orderBy, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+import { getFirestore, enableIndexedDbPersistence, collection, addDoc, onSnapshot, query, orderBy, limit, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
 // ==========================================
 // 2. CONFIGURACIÓN Y ESTADO GLOBAL
@@ -559,13 +559,49 @@ class PedidosSystem {
 // CLASE 4: SISTEMA DE FINANZAS
 // ==========================================
 class FinanzasSystem {
+    static limiteActual = 150;     // Empezamos cargando 150
+    static conexionFirebase = null; // Guardamos la conexión para poder reiniciarla
+
     static init() {
         document.getElementById('fecha-mov').value = Utils.obtenerFechaLocal();
-        onSnapshot(query(collection(db, "movimientos"), orderBy("fecha", "desc")), (snapshot) => {
-            Estado.movimientos = []; snapshot.forEach(doc => Estado.movimientos.push({ id: doc.id, ...doc.data() }));
-            if (UIManager.vistas.reportes.classList.contains('active')) this.renderizarReporte();
-            if (UIManager.vistas.dashboard.classList.contains('active')) DashboardSystem.renderizar();
-        });
+        this.cargarDatos(); // Llamamos a la función que conecta con Firebase
+
+        // Evento para el botón "Cargar más"
+        const btnCargarMas = document.getElementById('btn-cargar-mas-finanzas');
+        if (btnCargarMas) {
+            btnCargarMas.addEventListener('click', () => {
+                this.limiteActual += 150; // Sumamos 150 al límite
+                btnCargarMas.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Cargando...';
+                this.cargarDatos(); // Volvemos a pedir los datos
+            });
+        }
+    }
+
+    static cargarDatos() {
+        // Si ya estábamos conectados, desconectamos un microsegundo para actualizar el límite
+        if (this.conexionFirebase) {
+            this.conexionFirebase();
+        }
+
+        // Hacemos la consulta con el límite dinámico
+        this.conexionFirebase = onSnapshot(
+            query(collection(db, "movimientos"), orderBy("fecha", "desc"), limit(this.limiteActual)),
+            (snapshot) => {
+                Estado.movimientos = [];
+                snapshot.forEach(doc => Estado.movimientos.push({ id: doc.id, ...doc.data() }));
+
+                if (UIManager.vistas.reportes.classList.contains('active')) this.renderizarReporte();
+                if (UIManager.vistas.dashboard.classList.contains('active')) DashboardSystem.renderizar();
+
+                // Lógica del botón: Restaurar texto y ocultar si ya no hay más datos en la nube
+                const btnCargarMas = document.getElementById('btn-cargar-mas-finanzas');
+                if (btnCargarMas) {
+                    btnCargarMas.innerHTML = '<i class="fas fa-arrow-down me-1"></i> Cargar más antiguos';
+                    // Si Firebase nos devolvió menos documentos que el límite, significa que ya topamos con el inicio de los tiempos
+                    btnCargarMas.style.display = snapshot.docs.length < this.limiteActual ? 'none' : 'inline-block';
+                }
+            }
+        );
     }
 
     static async registrarManual(e) {
