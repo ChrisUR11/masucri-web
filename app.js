@@ -129,6 +129,7 @@ class UIManager {
 // ==========================================
 class PedidosSystem {
     static limiteHistorial = 50;
+    static primeraCargaNotificaciones = true; // Control para no hacer spam de notificaciones
 
     static init() {
         onSnapshot(query(collection(db, "pedidos"), orderBy("fecha_entrega", "asc")), (snapshot) => {
@@ -138,7 +139,50 @@ class PedidosSystem {
             this.renderizarPendientes();
             this.renderizarHistorial();
             if (UIManager.vistas.dashboard.classList.contains('active')) DashboardSystem.renderizar();
+
+            // EJECUTAR ALERTAS SOLO LA PRIMERA VEZ QUE CARGA
+            if (this.primeraCargaNotificaciones) {
+                this.analizarNotificaciones();
+                this.primeraCargaNotificaciones = false;
+            }
         }, (err) => { if (err.code === 'permission-denied') Swal.fire('Seguridad', 'Las reglas de Firebase bloquearon el acceso.', 'error'); });
+    }
+
+    // NUEVO MOTOR DE NOTIFICACIONES
+    static analizarNotificaciones() {
+        const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+        let atrasados = 0; let paraHoy = 0;
+
+        Estado.pedidos.filter(p => p.estado === 'Pendiente').forEach(ped => {
+            if (ped.fecha_entrega) {
+                const diff = Math.ceil((new Date(ped.fecha_entrega + 'T00:00:00') - hoy) / 86400000);
+                if (diff < 0) atrasados++;
+                else if (diff === 0) paraHoy++;
+            }
+        });
+
+        if (atrasados > 0 || paraHoy > 0) {
+            const mensaje = `¡Hola! Tienes ${atrasados} pedido(s) atrasados y ${paraHoy} para entregar hoy.`;
+
+            // 1. Mostrar Toast no intrusivo en la esquina
+            document.getElementById('toast-body-texto').textContent = mensaje;
+            const toastEl = document.getElementById('toast-notificacion');
+            const toast = new bootstrap.Toast(toastEl, { delay: 6000 }); // Dura 6 segundos y desaparece
+            toast.show();
+
+            // 2. Enviar Notificación Nativa al Celular (Push)
+            if ("Notification" in window) {
+                if (Notification.permission === "granted") {
+                    new Notification("Trabajos Pendientes ⚠️", { body: mensaje, icon: "logo-masucri.png" });
+                } else if (Notification.permission !== "denied") {
+                    Notification.requestPermission().then(permission => {
+                        if (permission === "granted") {
+                            new Notification("Trabajos Pendientes ⚠️", { body: mensaje, icon: "logo-masucri.png" });
+                        }
+                    });
+                }
+            }
+        }
     }
 
     static actualizarCatalogo() {
@@ -813,6 +857,15 @@ class DashboardSystem {
 class App {
     static init() {
         UIManager.init();
+
+        // INSTALAR LA PWA Y EL SERVICE WORKER
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('PWA instalada correctamente.', reg))
+                    .catch(err => console.log('PWA falló.', err));
+            });
+        }
 
         document.getElementById('form-pedido').addEventListener('submit', PedidosSystem.guardar);
         document.getElementById('form-movimiento').addEventListener('submit', FinanzasSystem.registrarManual);

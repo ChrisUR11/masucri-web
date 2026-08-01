@@ -1,0 +1,21 @@
+{
+    "name": "MASUCRI Admin",
+    "short_name": "MASUCRI",
+    "start_url": "./index.html",
+    "display": "standalone",
+    "background_color": "#f8f9fa",
+    "theme_color": "#212529",
+    "orientation": "portrait",
+    "icons": [
+        {
+            "src": "logo-masucri.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "logo-masucri.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}
