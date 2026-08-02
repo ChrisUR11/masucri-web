@@ -179,42 +179,78 @@
 
         <div class="container flex-grow-1">
 
-            <!-- VISTA 1: GESTIÓN DE PEDIDOS -->
+            <!-- VISTA 1: GESTIÓN DE PEDIDOS (KANBAN) -->
             <div id="vista-pedidos" class="view-section active">
                 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-                    <h3 class="fw-bold m-0">Pedidos Pendientes</h3>
-                    <button class="btn btn-primary fw-bold shadow-sm" onclick="PedidosSystem.abrirModal()">Nuevo
-                        Pedido</button>
+                    <h3 class="fw-bold m-0"><i class="fas fa-tasks text-primary"></i> Tablero de Producción</h3>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-warning fw-bold shadow-sm text-dark"
+                            onclick="window.VentaRapidaSystem.abrirModal()">
+                            <i class="fas fa-bolt"></i> Venta Rápida
+                        </button>
+                        <button class="btn btn-primary fw-bold shadow-sm" onclick="PedidosSystem.abrirModal()">
+                            <i class="fas fa-plus"></i> Nuevo Pedido
+                        </button>
+                    </div>
                 </div>
 
                 <div class="card shadow-sm mb-4 border-0">
                     <div class="card-body d-flex flex-wrap gap-3 align-items-end bg-white rounded">
                         <div class="flex-grow-1"><label class="form-label small text-muted mb-1">Buscar</label><input
-                                type="text" id="filtro-pedido-texto"
-                                class="form-control form-control-sm border-primary"></div>
-                        <div><label class="form-label small text-muted mb-1">Desde</label><input type="date"
+                                type="text" id="filtro-pedido-texto" class="form-control form-control-sm border-primary"
+                                placeholder="Cliente o producto..."></div>
+                        <div><label class="form-label small text-muted mb-1">Desde (Solicitud)</label><input type="date"
                                 id="filtro-pedido-solicitud" class="form-control form-control-sm"></div>
-                        <div><label class="form-label small text-muted mb-1">Hasta</label><input type="date"
-                                id="filtro-pedido-entrega" class="form-control form-control-sm"></div>
-                        <div><button id="btn-limpiar-pedidos"
-                                class="btn btn-sm btn-outline-secondary w-100">Limpiar</button></div>
+                        <div><button id="btn-limpiar-pedidos" class="btn btn-sm btn-outline-secondary w-100">Limpiar
+                                Filtros</button></div>
                     </div>
                 </div>
 
-                <div class="card shadow-sm border-0">
-                    <div class="card-body table-responsive p-0">
-                        <table class="table table-hover align-middle m-0 text-nowrap">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Prio.</th>
-                                    <th>Fechas</th>
-                                    <th>Cliente</th>
-                                    <th>Producto</th>
-                                    <th class="text-center">Acción</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tabla-pedidos"></tbody>
-                        </table>
+                <!-- TABLERO KANBAN -->
+                <div class="row g-3 flex-nowrap overflow-auto pb-3" id="kanban-board" style="min-height: 500px;">
+                    <!-- Columna 1: Pendiente -->
+                    <div class="col-12 col-md-4" style="min-width: 300px;">
+                        <div class="card bg-light h-100 border-0 shadow-sm">
+                            <div class="card-header border-bottom-0 text-white fw-bold d-flex justify-content-between align-items-center"
+                                style="background-color: #6c757d; border-radius: 8px 8px 0 0;">
+                                <span><i class="fas fa-inbox"></i> Pendiente</span>
+                                <span class="badge bg-white text-dark rounded-pill" id="count-pendiente">0</span>
+                            </div>
+                            <div class="card-body p-2 kanban-column" id="col-pendiente" data-estado="Pendiente"
+                                ondragover="event.preventDefault()" ondrop="PedidosSystem.drop(event)">
+                                <!-- Tarjetas se inyectan aquí -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Columna 2: En Producción -->
+                    <div class="col-12 col-md-4" style="min-width: 300px;">
+                        <div class="card bg-light h-100 border-0 shadow-sm">
+                            <div class="card-header border-bottom-0 text-white fw-bold d-flex justify-content-between align-items-center"
+                                style="background-color: #0dcaf0; border-radius: 8px 8px 0 0;">
+                                <span><i class="fas fa-hammer"></i> En Producción</span>
+                                <span class="badge bg-white text-dark rounded-pill" id="count-produccion">0</span>
+                            </div>
+                            <div class="card-body p-2 kanban-column" id="col-produccion" data-estado="En producción"
+                                ondragover="event.preventDefault()" ondrop="PedidosSystem.drop(event)">
+                                <!-- Tarjetas se inyectan aquí -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Columna 3: Por Retirar -->
+                    <div class="col-12 col-md-4" style="min-width: 300px;">
+                        <div class="card bg-light h-100 border-0 shadow-sm">
+                            <div class="card-header border-bottom-0 text-dark fw-bold d-flex justify-content-between align-items-center"
+                                style="background-color: #ffc107; border-radius: 8px 8px 0 0;">
+                                <span><i class="fas fa-box-open"></i> Por Retirar</span>
+                                <span class="badge bg-white text-dark rounded-pill" id="count-retirar">0</span>
+                            </div>
+                            <div class="card-body p-2 kanban-column" id="col-retirar" data-estado="Por Retirar"
+                                ondragover="event.preventDefault()" ondrop="PedidosSystem.drop(event)">
+                                <!-- Tarjetas se inyectan aquí -->
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -681,6 +717,66 @@
                     </div>
                     <div class="modal-footer justify-content-center bg-light gap-2" id="detalle-pedido-footer">
                         <!-- JS inyecta los botones según el estado -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL: VENTA RÁPIDA -->
+        <div class="modal fade" id="modalVentaRapida" tabindex="-1" data-bs-backdrop="static">
+            <div class="modal-dialog">
+                <div class="modal-content border-0 shadow">
+                    <div class="modal-header bg-warning text-dark">
+                        <h5 class="modal-title fw-bold"><i class="fas fa-bolt"></i> Venta Rápida / Entrega Inmediata
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="form-venta-rapida">
+                            <div class="row mb-3">
+                                <div class="col-6">
+                                    <label class="form-label small text-muted">Fecha</label>
+                                    <input type="date" id="vr-fecha" class="form-control" required readonly>
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small text-muted">Teléfono (Opcional)</label>
+                                    <input type="text" id="vr-telefono" class="form-control" placeholder="Ej: 88888888">
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Cliente</label>
+                                <input type="text" id="vr-cliente" class="form-control" required
+                                    placeholder="Nombre del cliente o 'Cliente de mostrador'">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Producto</label>
+                                <input type="text" id="vr-producto" class="form-control" list="catalogo-productos"
+                                    required placeholder="Ej: Llavero de resina">
+                            </div>
+                            <div class="row mb-3 bg-light p-2 rounded border">
+                                <div class="col-6">
+                                    <label class="form-label fw-bold text-primary">Precio Total (₡)</label>
+                                    <input type="number" id="vr-precio" class="form-control border-primary" required
+                                        min="1" step="0.01">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label fw-bold text-success">Monto Pagado Hoy (₡)</label>
+                                    <input type="number" id="vr-pagado" class="form-control border-success" required
+                                        min="0" step="0.01">
+                                </div>
+                                <div class="col-12 mt-2">
+                                    <small class="text-muted d-block mb-1">Si no paga el total, irá al Historial como
+                                        deuda.</small>
+                                    <select id="vr-metodo" class="form-select border-success form-select-sm">
+                                        <option value="Efectivo">Pago en Efectivo</option>
+                                        <option value="Sinpe Móvil">Pago por Sinpe Móvil</option>
+                                        <option value="Transferencia">Pago por Transferencia</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-warning w-100 fw-bold shadow-sm text-dark"><i
+                                    class="fas fa-check"></i> Registrar Venta</button>
+                        </form>
                     </div>
                 </div>
             </div>
