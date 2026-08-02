@@ -1008,6 +1008,45 @@ class App {
         document.getElementById('btn-login').addEventListener('click', () => signInWithPopup(auth, new GoogleAuthProvider()).catch(() => Swal.fire('Error', 'Fallo en login', 'error')));
         document.getElementById('btn-logout').addEventListener('click', async () => { if ((await Swal.fire({ title: '¿Salir?', icon: 'warning', showCancelButton: true })).isConfirmed) signOut(auth); });
 
+        // --- NUEVO: BOTÓN PARA FORZAR ACTUALIZACIÓN DE LA PWA ---
+        const btnUpdate = document.getElementById('btn-update-app');
+        if (btnUpdate) {
+            btnUpdate.addEventListener('click', async () => {
+                const result = await Swal.fire({
+                    title: '¿Buscar actualizaciones?',
+                    text: 'Esto limpiará la memoria caché de la app para descargar la versión más reciente. (Tranquilo, no perderás ningún dato ni pedido).',
+                    icon: 'info',
+                    showCancelButton: true,
+                    confirmButtonText: 'Sí, actualizar',
+                    cancelButtonText: 'Cancelar'
+                });
+
+                if (result.isConfirmed) {
+                    btnUpdate.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Actualizando...';
+
+                    // 1. Eliminar el motor de la PWA (Service Worker)
+                    if ('serviceWorker' in navigator) {
+                        const registrations = await navigator.serviceWorker.getRegistrations();
+                        for (let registration of registrations) {
+                            await registration.unregister();
+                        }
+                    }
+
+                    // 2. Borrar la caché guardada
+                    if ('caches' in window) {
+                        const cacheKeys = await caches.keys();
+                        for (let key of cacheKeys) {
+                            await caches.delete(key);
+                        }
+                    }
+
+                    // 3. Forzar la recarga de la página desde el servidor
+                    window.location.reload(true);
+                }
+            });
+        }
+        // --- FIN DEL BOTÓN DE ACTUALIZAR ---
+
         onAuthStateChanged(auth, async (user) => {
             if (user && CORREOS_PERMITIDOS.includes(user.email)) {
                 document.getElementById('login-container').classList.add('d-none'); document.getElementById('app-container').classList.remove('d-none'); document.getElementById('app-container').classList.add('d-flex');
