@@ -739,6 +739,29 @@ class App {
             });
         }
 
+        // --- NUEVO: BOTÓN FLOTANTE DE VOLVER ARRIBA ---
+        const btnScrollTop = document.getElementById('btn-scroll-top');
+        if (btnScrollTop) {
+            // Escuchar cuando la persona hace scroll en la pantalla
+            window.addEventListener('scroll', () => {
+                if (window.scrollY > 300) {
+                    // Si bajó más de 300 píxeles, mostramos el botón
+                    btnScrollTop.classList.remove('d-none');
+                    btnScrollTop.classList.add('d-flex');
+                } else {
+                    // Si está arriba, lo escondemos
+                    btnScrollTop.classList.remove('d-flex');
+                    btnScrollTop.classList.add('d-none');
+                }
+            });
+
+            // Cuando le dan clic, subir suavemente
+            btnScrollTop.addEventListener('click', () => {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        }
+        // --- FIN BOTÓN SUBIR ---
+
         onAuthStateChanged(auth, async (user) => {
             if (user && CORREOS_PERMITIDOS.includes(user.email)) {
                 document.getElementById('login-container').classList.add('d-none'); document.getElementById('app-container').classList.remove('d-none'); document.getElementById('app-container').classList.add('d-flex');
