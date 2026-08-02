@@ -220,10 +220,10 @@
                                 <div class="d-flex align-items-center gap-2">
                                     <span class="badge bg-white text-dark rounded-pill" id="count-pendiente">0</span>
                                     <!-- Botón flecha derecha (Solo móvil) -->
-                                    <button
+                                    <button type="button"
                                         class="btn btn-sm btn-outline-light p-0 border-0 d-md-none d-flex align-items-center justify-content-center"
                                         style="width: 28px; height: 28px;"
-                                        onclick="document.getElementById('vista-col-produccion').scrollIntoView({behavior: 'smooth', inline: 'start', block: 'nearest'})">
+                                        onclick="document.getElementById('kanban-board').scrollBy({left: 350, behavior: 'smooth'})">
                                         <i class="fas fa-chevron-right"></i>
                                     </button>
                                 </div>
@@ -243,10 +243,10 @@
                                 style="background-color: #0dcaf0; border-radius: 8px 8px 0 0;">
                                 <div class="d-flex align-items-center gap-2">
                                     <!-- Botón flecha izquierda (Solo móvil) -->
-                                    <button
+                                    <button type="button"
                                         class="btn btn-sm btn-outline-light p-0 border-0 d-md-none d-flex align-items-center justify-content-center"
                                         style="width: 28px; height: 28px;"
-                                        onclick="document.getElementById('vista-col-pendiente').scrollIntoView({behavior: 'smooth', inline: 'start', block: 'nearest'})">
+                                        onclick="document.getElementById('kanban-board').scrollBy({left: -350, behavior: 'smooth'})">
                                         <i class="fas fa-chevron-left"></i>
                                     </button>
                                     <span><i class="fas fa-hammer"></i> En Producción</span>
@@ -254,10 +254,10 @@
                                 <div class="d-flex align-items-center gap-2">
                                     <span class="badge bg-white text-dark rounded-pill" id="count-produccion">0</span>
                                     <!-- Botón flecha derecha (Solo móvil) -->
-                                    <button
+                                    <button type="button"
                                         class="btn btn-sm btn-outline-light p-0 border-0 d-md-none d-flex align-items-center justify-content-center"
                                         style="width: 28px; height: 28px;"
-                                        onclick="document.getElementById('vista-col-retirar').scrollIntoView({behavior: 'smooth', inline: 'start', block: 'nearest'})">
+                                        onclick="document.getElementById('kanban-board').scrollBy({left: 350, behavior: 'smooth'})">
                                         <i class="fas fa-chevron-right"></i>
                                     </button>
                                 </div>
@@ -277,10 +277,10 @@
                                 style="background-color: #ffc107; border-radius: 8px 8px 0 0;">
                                 <div class="d-flex align-items-center gap-2">
                                     <!-- Botón flecha izquierda (Solo móvil) -->
-                                    <button
+                                    <button type="button"
                                         class="btn btn-sm btn-outline-dark p-0 border-0 d-md-none d-flex align-items-center justify-content-center"
                                         style="width: 28px; height: 28px;"
-                                        onclick="document.getElementById('vista-col-produccion').scrollIntoView({behavior: 'smooth', inline: 'start', block: 'nearest'})">
+                                        onclick="document.getElementById('kanban-board').scrollBy({left: -350, behavior: 'smooth'})">
                                         <i class="fas fa-chevron-left"></i>
                                     </button>
                                     <span><i class="fas fa-box-open"></i> Por Retirar</span>
