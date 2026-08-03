@@ -172,8 +172,12 @@ class PedidosSystem {
             this.actualizarCatalogo();
             this.renderizarPendientes();
             this.renderizarHistorial();
+            // Si el historial falla, el código de abajo nunca se ejecuta. Ya está arreglado abajo.
             if (UIManager.vistas.dashboard.classList.contains('active')) DashboardSystem.renderizar();
-            if (this.primeraCargaNotificaciones) { this.analizarNotificaciones(); this.primeraCargaNotificaciones = false; }
+            if (this.primeraCargaNotificaciones) {
+                this.analizarNotificaciones();
+                this.primeraCargaNotificaciones = false;
+            }
         });
     }
 
@@ -194,10 +198,10 @@ class PedidosSystem {
             new bootstrap.Toast(document.getElementById('toast-notificacion'), { delay: 6000 }).show();
             if ("Notification" in window) {
                 if (Notification.permission === "granted") {
-                    new Notification("Trabajos Pendientes ⚠️", { body: mensaje, icon: "logo-masucri.png" });
+                    navigator.serviceWorker.ready.then(reg => reg.showNotification("Trabajos Pendientes ⚠️", { body: mensaje, icon: "logo-masucri.png" }));
                 } else if (Notification.permission !== "denied") {
                     Notification.requestPermission().then(permission => {
-                        if (permission === "granted") new Notification("Trabajos Pendientes ⚠️", { body: mensaje, icon: "logo-masucri.png" });
+                        if (permission === "granted") navigator.serviceWorker.ready.then(reg => reg.showNotification("Trabajos Pendientes ⚠️", { body: mensaje, icon: "logo-masucri.png" }));
                     });
                 }
             }
@@ -246,7 +250,6 @@ class PedidosSystem {
 
     // --- TABLERO KANBAN (DRAG & DROP) ---
     static dragStart(e, id) { e.dataTransfer.setData('text/plain', id); }
-
     static async drop(e) {
         e.preventDefault(); const id = e.dataTransfer.getData('text/plain');
         let target = e.target;
@@ -256,10 +259,8 @@ class PedidosSystem {
             this.cambiarEstado(id, nuevoEstado);
         }
     }
-
     static async cambiarEstado(id, nuevoEstado) {
         const ped = Estado.pedidos.find(p => p.id === id); if (!ped || ped.estado === nuevoEstado) return;
-
         if (nuevoEstado === 'Entregado') {
             this.entregar(id);
         } else {
@@ -273,18 +274,13 @@ class PedidosSystem {
         const colProduccion = document.getElementById('col-produccion');
         const colRetirar = document.getElementById('col-retirar');
         if (!colPendiente) return;
-
         let cPen = 0, cPro = 0, cRet = 0;
         let htmlPen = '', htmlPro = '', htmlRet = '';
-
         let activos = Estado.pedidos.filter(p => this.estadosActivos.includes(p.estado));
         const fTexto = document.getElementById('filtro-pedido-texto') ? document.getElementById('filtro-pedido-texto').value.toLowerCase() : '';
-        if (fTexto) activos = activos.filter(p => p.cliente.toLowerCase().includes(fTexto) || p.producto.toLowerCase().includes(fTexto));
-
+        if (fTexto) activos = activos.filter(p => (p.cliente && p.cliente.toLowerCase().includes(fTexto)) || (p.producto && p.producto.toLowerCase().includes(fTexto)));
         activos.sort((a, b) => new Date(a.fecha_entrega || '2099-01-01') - new Date(b.fecha_entrega || '2099-01-01'));
-
         const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
-
         activos.forEach(ped => {
             let colorAlerta = 'border-secondary';
             if (ped.fecha_entrega) {
@@ -292,9 +288,7 @@ class PedidosSystem {
                 if (diff < 0) colorAlerta = 'border-danger bg-danger-subtle';
                 else if (diff === 0) colorAlerta = 'border-warning bg-warning-subtle';
             }
-
             const deuda = (ped.precio || 0) - (ped.monto_pagado || 0);
-
             const cardHtml = `
                 <div class="card mb-2 shadow-sm border-start border-4 ${colorAlerta}" draggable="true" ondragstart="PedidosSystem.dragStart(event, '${ped.id}')" style="cursor: grab;">
                     <div class="card-body p-2">
@@ -312,16 +306,13 @@ class PedidosSystem {
                     </div>
                 </div>
             `;
-
             if (ped.estado === 'Pendiente') { htmlPen += cardHtml; cPen++; }
             else if (ped.estado === 'En producción') { htmlPro += cardHtml; cPro++; }
             else if (ped.estado === 'Por Retirar') { htmlRet += cardHtml; cRet++; }
         });
-
         colPendiente.innerHTML = htmlPen || '<p class="text-center text-muted small mt-3">Sin tareas.</p>';
         colProduccion.innerHTML = htmlPro || '<p class="text-center text-muted small mt-3">Sin tareas.</p>';
         colRetirar.innerHTML = htmlRet || '<p class="text-center text-muted small mt-3">Sin tareas.</p>';
-
         document.getElementById('count-pendiente').textContent = cPen;
         document.getElementById('count-produccion').textContent = cPro;
         document.getElementById('count-retirar').textContent = cRet;
@@ -338,17 +329,20 @@ class PedidosSystem {
         else if (filtro === 'entregados') historial = historial.filter(p => p.estado === 'Entregado' && (p.precio - (p.monto_pagado || 0)) <= 0);
         else if (filtro === 'anulados') historial = historial.filter(p => p.estado === 'Cancelado');
 
-        // NUEVO: Filtro por texto en historial
-        if (filtroTexto) historial = historial.filter(p => p.cliente.toLowerCase().includes(filtroTexto) || p.producto.toLowerCase().includes(filtroTexto));
+        // REPARADO: Filtro por texto a prueba de valores vacíos (null)
+        if (filtroTexto) {
+            historial = historial.filter(p =>
+                (p.cliente && p.cliente.toLowerCase().includes(filtroTexto)) ||
+                (p.producto && p.producto.toLowerCase().includes(filtroTexto))
+            );
+        }
 
         const tot = historial.length; const hCort = historial.slice(0, this.limiteHistorial);
         const tbody = document.getElementById('tabla-historial'); let html = '';
-
         hCort.forEach(ped => {
             let bColor = ped.estado === 'Entregado' ? 'bg-success' : 'bg-danger'; let txtEst = ped.estado;
             const deuda = (ped.precio || 0) - (ped.monto_pagado || 0);
             if (ped.estado === 'Entregado' && deuda > 0) { bColor = 'bg-warning text-dark'; txtEst = 'Con Saldo'; }
-
             html += `<tr>
                 <td class="align-middle"><span class="badge ${bColor}">${txtEst}</span></td>
                 <td class="align-middle fw-bold">${ped.cliente}</td>
@@ -364,7 +358,6 @@ class PedidosSystem {
     static abrirDetallePedido(id) {
         const ped = Estado.pedidos.find(p => p.id === id); if (!ped) return;
         const deuda = (ped.precio || 0) - (ped.monto_pagado || 0);
-
         let bColor = 'secondary'; let txtEst = ped.estado;
         if (ped.estado === 'Pendiente') bColor = 'secondary text-white';
         else if (ped.estado === 'En producción') bColor = 'info text-dark';
@@ -380,7 +373,6 @@ class PedidosSystem {
             histPagos.forEach((p, idx) => { pagosHtml += `<div class="d-flex justify-content-between small border-bottom pb-1 mb-1"><span>${p.fecha} <span class="badge bg-secondary ms-1">${p.metodo}</span></span><span class="text-success fw-bold">₡${p.monto.toLocaleString('es-CR')}</span></div>`; });
             pagosHtml += `</li>`;
         }
-
         document.getElementById('detalle-pedido-body').innerHTML = `
             <div class="text-center py-3 bg-light border-bottom">
                 <span class="badge bg-${bColor} fs-6 px-3 py-2 border shadow-sm">${txtEst}</span>
@@ -403,10 +395,8 @@ class PedidosSystem {
                 ${deuda < 0 ? `<li class="list-group-item text-center bg-success text-white fw-bold fs-5">Propina a favor: ₡${Math.abs(deuda).toLocaleString('es-CR')}</li>` : ''}
             </ul>
         `;
-
         let footerHtml = '';
         if (this.estadosActivos.includes(ped.estado)) {
-            // Dropdown para cambiar de estado rápidamente
             footerHtml += `
             <div class="w-100 px-3 pb-2 border-bottom mb-2 text-center">
                 <small class="text-muted fw-bold d-block mb-1">Mover ficha a:</small>
@@ -417,48 +407,24 @@ class PedidosSystem {
                 </div>
             </div>`;
 
-            // Botones de Acción
             footerHtml += `<div class="d-flex flex-wrap justify-content-center gap-2 w-100 mt-2">`;
-
-            // NUEVO: Agregado el botón de Ticket en el Kanban
             footerHtml += `<button class="btn btn-outline-info fw-bold" onclick="PedidosSystem.ejecutarAccionDetalle('reimprimir', '${ped.id}')"><i class="fas fa-receipt"></i> Ticket</button>`;
-
             footerHtml += `<button class="btn btn-success fw-bold" onclick="PedidosSystem.ejecutarAccionDetalle('entregar', '${ped.id}')"><i class="fas fa-check"></i> Entregar</button>`;
-
             if (deuda > 0 || !ped.precio) footerHtml += `<button class="btn btn-outline-primary fw-bold" onclick="PedidosSystem.ejecutarAccionDetalle('abonar', '${ped.id}')"><i class="fas fa-coins"></i> Abonar</button>`;
-
-            // NUEVO: Textos en los botones Editar y Anular
             footerHtml += `<button class="btn btn-outline-secondary" onclick="PedidosSystem.ejecutarAccionDetalle('editar', '${ped.id}')"><i class="fas fa-pen"></i> Editar</button>`;
             footerHtml += `<button class="btn btn-outline-danger" onclick="PedidosSystem.ejecutarAccionDetalle('cancelar', '${ped.id}')"><i class="fas fa-times"></i> Anular</button>`;
             footerHtml += `</div>`;
-
-            /* --- INICIO WHATSAPP ---
-            if (ped.telefono) footerHtml += `<button class="btn text-white shadow-sm" style="background-color: #25D366;" onclick="PedidosSystem.enviarWhatsApp('${ped.id}', 'listo')"><i class="fab fa-whatsapp"></i> Avisar</button>`;
-            --- FIN WHATSAPP --- */
-
-            if (deuda > 0 || !ped.precio) footerHtml += `<button class="btn btn-outline-primary" onclick="PedidosSystem.ejecutarAccionDetalle('abonar', '${ped.id}')"><i class="fas fa-coins"></i> Abonar</button>`;
-            footerHtml += `<button class="btn btn-outline-secondary" onclick="PedidosSystem.ejecutarAccionDetalle('editar', '${ped.id}')"><i class="fas fa-pen"></i></button>`;
-            footerHtml += `<button class="btn btn-outline-danger" onclick="PedidosSystem.ejecutarAccionDetalle('cancelar', '${ped.id}')"><i class="fas fa-times"></i></button>`;
-            footerHtml += `</div>`;
         } else {
-            // Historial
             footerHtml += `<div class="d-flex flex-wrap justify-content-center gap-2 w-100">`;
             footerHtml += `<button class="btn btn-outline-info" onclick="PedidosSystem.ejecutarAccionDetalle('reimprimir', '${ped.id}')"><i class="fas fa-receipt"></i> Ticket</button>`;
             if (ped.estado === 'Entregado' && deuda > 0) {
                 footerHtml += `<button class="btn btn-success" onclick="PedidosSystem.ejecutarAccionDetalle('abonar', '${ped.id}')"><i class="fas fa-coins"></i> Abonar</button>`;
-
-                /* --- INICIO WHATSAPP OCULTO ---
-                if (ped.telefono) {
-                    footerHtml += `<button class="btn text-white shadow-sm" style="background-color: #25D366;" onclick="PedidosSystem.enviarWhatsApp('${ped.id}', 'cobro')" title="Cobrar saldo por WhatsApp"><i class="fab fa-whatsapp"></i> Cobrar</button>`;
-                }
-                --- FIN WHATSAPP OCULTO --- */
             }
             footerHtml += `<button class="btn btn-dark shadow-sm" onclick="PedidosSystem.cambiarEstado('${ped.id}', 'Pendiente')" title="Devolver al Kanban"><i class="fas fa-undo"></i> Revertir a Pendiente</button>`;
             footerHtml += `<button class="btn btn-outline-danger" onclick="PedidosSystem.ejecutarAccionDetalle('borrar', '${ped.id}')"><i class="fas fa-trash"></i></button>`;
             footerHtml += `</div>`;
         }
         document.getElementById('detalle-pedido-footer').innerHTML = footerHtml;
-
         if (Estado.modales.detallePedido) Estado.modales.detallePedido.show();
     }
 
@@ -507,12 +473,10 @@ class PedidosSystem {
             producto: document.getElementById('ped-producto').value.trim(), descripcion: document.getElementById('ped-desc').value.trim(),
             precio: parseFloat(document.getElementById('ped-precio').value) || 0
         };
-
         if (datos.fecha_entrega && datos.fecha_entrega < datos.fecha_solicitud) return Swal.fire('Error', 'La fecha de entrega es menor a solicitud.', 'error');
         const btn = e.target.querySelector('button'); btn.disabled = true;
         try {
-            if (id) { await updateDoc(doc(db, "pedidos", id), datos); }
-            else {
+            if (id) { await updateDoc(doc(db, "pedidos", id), datos); } else {
                 datos.estado = 'Pendiente'; datos.monto_pagado = adelanto; datos.historial_pagos = [];
                 if (adelanto > 0) { datos.ultimo_metodo_pago = metodoAdelanto; datos.historial_pagos.push({ fecha: Utils.obtenerFechaLocal(), monto: adelanto, metodo: metodoAdelanto }); }
                 datos.timestamp = new Date(); await addDoc(collection(db, "pedidos"), datos);
@@ -548,7 +512,6 @@ class PedidosSystem {
             let arrPagos = ped.historial_pagos || [];
             if (arrPagos.length === 0 && (ped.monto_pagado || 0) > 0) arrPagos.push({ fecha: ped.fecha_solicitud, monto: ped.monto_pagado, metodo: 'Anterior' });
             if (cobradoHoy > 0) arrPagos.push({ fecha: hoy, monto: cobradoHoy, metodo: metodo });
-
             try {
                 await updateDoc(doc(db, "pedidos", id), { estado: 'Entregado', monto_pagado: totalPagadoHistorico, fecha_cierre: hoy, ultimo_metodo_pago: metodo, historial_pagos: arrPagos });
                 if (cobradoHoy > 0) FinanzasSystem.registrarDesdePedido(metodo, hoy, `Pago final: ${ped.producto}`, ped.cliente, cobradoHoy);
@@ -567,7 +530,14 @@ class PedidosSystem {
         }
         const dAnt = pTot - (ped.monto_pagado || 0);
         if (dAnt <= 0) return Swal.fire('Aviso', 'Pagado en su totalidad.', 'info');
-        const r = await Swal.fire({ title: 'Abonar', html: `<div class="text-start mb-2"><label>Deuda Actual: ₡${dAnt.toLocaleString()}</label><input id="swal-monto" type="number" class="form-control" placeholder="Monto"></div><select id="swal-metodo" class="form-select"><option>Efectivo</option><option>Sinpe Móvil</option></select>`, showCancelButton: true, preConfirm: () => { const m = parseFloat(document.getElementById('swal-monto').value); if (!m || m <= 0) { Swal.showValidationMessage('Monto inválido'); return false; } return { m, met: document.getElementById('swal-metodo').value }; } });
+        const r = await Swal.fire({
+            title: 'Abonar', html: `<div class="text-start mb-2"><label>Deuda Actual: ₡${dAnt.toLocaleString()}</label><input id="swal-monto" type="number" class="form-control" placeholder="Monto"></div><select id="swal-metodo" class="form-select"><option>Efectivo</option><option>Sinpe Móvil</option></select>`,
+            showCancelButton: true, preConfirm: () => {
+                const m = parseFloat(document.getElementById('swal-monto').value);
+                if (!m || m <= 0) { Swal.showValidationMessage('Monto inválido'); return false; }
+                return { m, met: document.getElementById('swal-metodo').value };
+            }
+        });
         if (r.isConfirmed) {
             const { m, met } = r.value; const nPagado = (ped.monto_pagado || 0) + m; const hoy = Utils.obtenerFechaLocal();
             let arrPagos = ped.historial_pagos || []; arrPagos.push({ fecha: hoy, monto: m, metodo: met });
@@ -576,6 +546,7 @@ class PedidosSystem {
             Swal.fire('Registrado', '', 'success');
         }
     }
+
     static async cancelar(id) { if ((await Swal.fire({ title: '¿Anular este pedido?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545' })).isConfirmed) await updateDoc(doc(db, "pedidos", id), { estado: 'Cancelado', fecha_cierre: Utils.obtenerFechaLocal() }); }
     static reimprimir(id) { const p = Estado.pedidos.find(x => x.id === id); if (!p) return; const pTot = p.precio || 0, pag = p.monto_pagado || 0, sal = pTot - pag; TicketSystem.generar(p.id.slice(-5).toUpperCase(), p.cliente, p.producto, pTot, pTot, pag, Math.max(0, sal), sal <= 0 ? 'CANCELADO' : 'SALDO PENDIENTE', p.ultimo_metodo_pago || 'Historial'); }
     static async borrarHistorial(id) { if ((await Swal.fire({ title: '¿Borrar definitivo?', text: 'Se borrará el registro.', icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33' })).isConfirmed) await deleteDoc(doc(db, "pedidos", id)); }
@@ -630,13 +601,17 @@ class DashboardSystem {
         if (!UIManager.vistas.dashboard.classList.contains('active')) return;
         this.renderUtilidadNeta(); this.renderCRM(); this.renderVolatilidad(); this.renderEstacionalidad(); this.renderRetencion(); this.renderGastosAgrupados(); this.renderMetricasAvanzadas();
 
-        // Calcular y mostrar el rango de fechas de los datos
+        // REPARADO: Fallback por si la base de datos no tiene fechas o se está cargando
         let todasLasFechas = [...Estado.pedidos.map(p => p.fecha_solicitud), ...Estado.movimientos.map(m => m.fecha)].filter(f => f);
-        if (todasLasFechas.length > 0) {
-            todasLasFechas.sort();
-            const min = todasLasFechas[0]; const max = todasLasFechas[todasLasFechas.length - 1];
-            const divFechas = document.getElementById('bi-rango-fechas');
-            if (divFechas) divFechas.innerHTML = `<i class="fas fa-calendar-alt"></i> Analizando datos del historial: desde <strong>${min}</strong> hasta <strong>${max}</strong>`;
+        const divFechas = document.getElementById('bi-rango-fechas');
+        if (divFechas) {
+            if (todasLasFechas.length > 0) {
+                todasLasFechas.sort();
+                const min = todasLasFechas[0]; const max = todasLasFechas[todasLasFechas.length - 1];
+                divFechas.innerHTML = `<i class="fas fa-calendar-alt"></i> Analizando datos del historial: desde <strong>${min}</strong> hasta <strong>${max}</strong>`;
+            } else {
+                divFechas.innerHTML = `<i class="fas fa-calendar-alt"></i> Aún no hay suficientes datos para establecer el rango.`;
+            }
         }
     }
     static renderMetricasAvanzadas() {
@@ -691,33 +666,13 @@ class DashboardSystem {
     }
     static renderGastosAgrupados() {
         let gastos = { 'Telas y Costura': 0, 'Suministros (Sublimación)': 0, 'Transporte': 0, 'Servicios Públicos': 0, 'Alimentación': 0, 'Gastos Generales': 0 };
-
         Estado.movimientos.filter(m => m.tipo === 'salida').forEach(m => {
             let desc = (m.descripcion || '').toLowerCase(); let entidad = (m.entidad || '').toLowerCase(); let txt = desc + " " + entidad;
-
-            if (txt.includes('tela') || txt.includes('aracely') || txt.includes('brush') || txt.includes('hilo')) {
-                gastos['Telas y Costura'] += m.monto;
-            } else if (txt.includes('ubora') || txt.includes('suministro') || txt.includes('sublimación') || txt.includes('sublimacion') || txt.includes('tinta') || txt.includes('papel') || txt.includes('vinil')) {
-                gastos['Suministros (Sublimación)'] += m.monto;
-            } else if (txt.includes('pasaje') || txt.includes('bus') || txt.includes('uber') || txt.includes('transporte') || txt.includes('gasolina') || txt.includes('bomba') || txt.includes('transtusa')) {
-                gastos['Transporte'] += m.monto;
-            } else if (txt.includes('ice') || txt.includes('luz') || txt.includes('agua') || txt.includes('municipalidad') || txt.includes('internet')) {
-                gastos['Servicios Públicos'] += m.monto;
-            } else if (txt.includes('comida') || txt.includes('macdonald') || txt.includes('almuerzo')) {
-                gastos['Alimentación'] += m.monto;
-            } else {
-                gastos['Gastos Generales'] += m.monto;
-            }
+            if (txt.includes('tela') || txt.includes('aracely') || txt.includes('brush') || txt.includes('hilo')) { gastos['Telas y Costura'] += m.monto; } else if (txt.includes('ubora') || txt.includes('suministro') || txt.includes('sublimación') || txt.includes('sublimacion') || txt.includes('tinta') || txt.includes('papel') || txt.includes('vinil')) { gastos['Suministros (Sublimación)'] += m.monto; } else if (txt.includes('pasaje') || txt.includes('bus') || txt.includes('uber') || txt.includes('transporte') || txt.includes('gasolina') || txt.includes('bomba') || txt.includes('transtusa')) { gastos['Transporte'] += m.monto; } else if (txt.includes('ice') || txt.includes('luz') || txt.includes('agua') || txt.includes('municipalidad') || txt.includes('internet')) { gastos['Servicios Públicos'] += m.monto; } else if (txt.includes('comida') || txt.includes('macdonald') || txt.includes('almuerzo')) { gastos['Alimentación'] += m.monto; } else { gastos['Gastos Generales'] += m.monto; }
         });
-
-        // Limpiar los rubros que estén en 0
         Object.keys(gastos).forEach(key => { if (gastos[key] === 0) delete gastos[key]; });
-
-        const etiquetas = Object.keys(gastos); const valores = Object.values(gastos);
-        const colores = ['#e83e8c', '#0dcaf0', '#fd7e14', '#0d6efd', '#20c997', '#6c757d'];
-
-        if (window.chartGastos) window.chartGastos.destroy();
-        window.chartGastos = new Chart(document.getElementById('graficoGastos').getContext('2d'), { type: 'doughnut', data: { labels: etiquetas, datasets: [{ data: valores, backgroundColor: colores.slice(0, etiquetas.length) }] }, options: { responsive: true, maintainAspectRatio: false } });
+        const etiquetas = Object.keys(gastos); const valores = Object.values(gastos); const colores = ['#e83e8c', '#0dcaf0', '#fd7e14', '#0d6efd', '#20c997', '#6c757d'];
+        if (window.chartGastos) window.chartGastos.destroy(); window.chartGastos = new Chart(document.getElementById('graficoGastos').getContext('2d'), { type: 'doughnut', data: { labels: etiquetas, datasets: [{ data: valores, backgroundColor: colores.slice(0, etiquetas.length) }] }, options: { responsive: true, maintainAspectRatio: false } });
     }
 }
 
@@ -733,7 +688,7 @@ class App {
         if (inputTel) inputTel.addEventListener('change', () => PedidosSystem.verificarLealtad()); if (inputNom) inputNom.addEventListener('change', () => PedidosSystem.verificarLealtad());
 
         document.getElementById('form-pedido').addEventListener('submit', PedidosSystem.guardar);
-        document.getElementById('form-venta-rapida').addEventListener('submit', VentaRapidaSystem.guardar); // NUEVO
+        document.getElementById('form-venta-rapida').addEventListener('submit', VentaRapidaSystem.guardar);
         document.getElementById('form-movimiento').addEventListener('submit', FinanzasSystem.registrarManual);
         document.getElementById('form-editar-mov').addEventListener('submit', FinanzasSystem.guardarEdicion);
         document.getElementById('btn-export-pdf').addEventListener('click', () => this.exportar('pdf')); document.getElementById('btn-export-excel').addEventListener('click', () => this.exportar('excel'));
@@ -748,11 +703,10 @@ class App {
         document.getElementById('filtro-historial').addEventListener('change', () => PedidosSystem.renderizarHistorial());
         ['filtro-modo', 'filtro-inicio', 'filtro-fin'].forEach(id => document.getElementById(id).addEventListener('input', () => FinanzasSystem.renderizarReporte()));
 
-        // NUEVO: Escuchar la barra de búsqueda del Historial
         const fTextHist = document.getElementById('filtro-historial-texto');
         if (fTextHist) fTextHist.addEventListener('input', () => PedidosSystem.renderizarHistorial());
 
-        // NUEVO: SISTEMA DE CONTACTOS PARA VENTA RÁPIDA
+        // NUEVO: SISTEMA DE CONTACTOS PARA VENTA RÁPIDA (REPARADO)
         const btnContactosVR = document.getElementById('btn-contactos-vr');
         if (btnContactosVR) {
             if ('contacts' in navigator && 'ContactsManager' in window) {
@@ -773,10 +727,13 @@ class App {
                         }
                     } catch (ex) { console.log("Selección de contacto VR cancelada."); }
                 });
-            } else { btnContactosVR.style.display = 'none'; }
+            } else {
+                btnContactosVR.classList.add('d-none');
+                if (btnContactosVR.parentElement) btnContactosVR.parentElement.classList.remove('input-group');
+            }
         }
 
-        // --- SISTEMA DE CONTACTOS ---
+        // --- SISTEMA DE CONTACTOS ORIGINAL (REPARADO) ---
         const btnContactos = document.getElementById('btn-contactos');
         if (btnContactos) {
             if ('contacts' in navigator && 'ContactsManager' in window) {
@@ -798,13 +755,15 @@ class App {
                         }
                     } catch (ex) { console.log("Selección de contacto cancelada."); }
                 });
-            } else { btnContactos.style.display = 'none'; }
+            } else {
+                btnContactos.classList.add('d-none');
+                if (btnContactos.parentElement) btnContactos.parentElement.classList.remove('input-group');
+            }
         }
 
         document.getElementById('btn-login').addEventListener('click', () => signInWithPopup(auth, new GoogleAuthProvider()).catch(() => Swal.fire('Error', 'Fallo en login', 'error')));
         document.getElementById('btn-logout').addEventListener('click', async () => { if ((await Swal.fire({ title: '¿Salir?', icon: 'warning', showCancelButton: true })).isConfirmed) signOut(auth); });
 
-        // --- BOTÓN DE ACTUALIZAR ---
         const btnUpdate = document.getElementById('btn-update-app');
         if (btnUpdate) {
             btnUpdate.addEventListener('click', async () => {
@@ -817,28 +776,14 @@ class App {
             });
         }
 
-        // --- NUEVO: BOTÓN FLOTANTE DE VOLVER ARRIBA ---
         const btnScrollTop = document.getElementById('btn-scroll-top');
         if (btnScrollTop) {
-            // Escuchar cuando la persona hace scroll en la pantalla
             window.addEventListener('scroll', () => {
-                if (window.scrollY > 300) {
-                    // Si bajó más de 300 píxeles, mostramos el botón
-                    btnScrollTop.classList.remove('d-none');
-                    btnScrollTop.classList.add('d-flex');
-                } else {
-                    // Si está arriba, lo escondemos
-                    btnScrollTop.classList.remove('d-flex');
-                    btnScrollTop.classList.add('d-none');
-                }
+                if (window.scrollY > 300) { btnScrollTop.classList.remove('d-none'); btnScrollTop.classList.add('d-flex'); }
+                else { btnScrollTop.classList.remove('d-flex'); btnScrollTop.classList.add('d-none'); }
             });
-
-            // Cuando le dan clic, subir suavemente
-            btnScrollTop.addEventListener('click', () => {
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            });
+            btnScrollTop.addEventListener('click', () => { window.scrollTo({ top: 0, behavior: 'smooth' }); });
         }
-        // --- FIN BOTÓN SUBIR ---
 
         onAuthStateChanged(auth, async (user) => {
             if (user && CORREOS_PERMITIDOS.includes(user.email)) {
@@ -853,6 +798,7 @@ class App {
             else { document.getElementById('login-container').classList.remove('d-none'); document.getElementById('app-container').classList.add('d-none'); document.getElementById('app-container').classList.remove('d-flex'); }
         });
     }
+
     static exportar(tipo) {
         if (Estado.datosParaExportar.length === 0) return Swal.fire('Aviso', 'Sin datos', 'warning');
         if (tipo === 'pdf') {
