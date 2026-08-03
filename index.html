@@ -296,573 +296,566 @@
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <!-- VISTA 2: HISTORIAL DE ENTREGAS -->
-                <div id="vista-historial" class="view-section">
-                    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-                        <h3 class="fw-bold m-0">Historial de Trabajos</h3>
-                        <select id="filtro-historial"
-                            class="form-select w-auto border-primary fw-bold text-primary shadow-sm">
-                            <option value="con_saldo" selected>Mostrar: Con Saldo Pendiente</option>
-                            <option value="todos">Mostrar: Todos</option>
-                            <option value="entregados">Mostrar: Cancelados al 100%</option>
-                            <option value="anulados">Mostrar: Anulados/Eliminados</option>
-                        </select>
-                    </div>
-                    <div class="card shadow-sm border-0">
-                        <div class="card-body table-responsive p-0" style="max-height: 600px; overflow-y: auto;">
-                            <table class="table table-hover align-middle m-0 text-nowrap">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>Estado</th>
-                                        <th>Cliente</th>
-                                        <th>Producto</th>
-                                        <th class="text-center">Acción</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="tabla-historial"></tbody>
-                            </table>
-                        </div>
+            <!-- VISTA 2: HISTORIAL DE ENTREGAS -->
+            <div id="vista-historial" class="view-section">
+                <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+                    <h3 class="fw-bold m-0">Historial de Trabajos</h3>
+                    <select id="filtro-historial"
+                        class="form-select w-auto border-primary fw-bold text-primary shadow-sm">
+                        <option value="con_saldo" selected>Mostrar: Con Saldo Pendiente</option>
+                        <option value="todos">Mostrar: Todos</option>
+                        <option value="entregados">Mostrar: Cancelados al 100%</option>
+                        <option value="anulados">Mostrar: Anulados/Eliminados</option>
+                    </select>
+                </div>
+                <div class="card shadow-sm border-0">
+                    <div class="card-body table-responsive p-0" style="max-height: 600px; overflow-y: auto;">
+                        <table class="table table-hover align-middle m-0 text-nowrap">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Estado</th>
+                                    <th>Cliente</th>
+                                    <th>Producto</th>
+                                    <th class="text-center">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabla-historial"></tbody>
+                        </table>
                     </div>
                 </div>
+            </div>
 
-                <!-- VISTA 3: REGISTRO FINANCIERO MANUAL -->
-                <div id="vista-registro" class="view-section">
-                    <div class="row justify-content-center">
-                        <div class="col-md-8">
-                            <div class="card shadow-sm mb-5 border-0">
-                                <div class="card-header bg-success text-white fw-bold">Registrar Movimiento Manual en
-                                    Caja
-                                </div>
-                                <div class="card-body">
-                                    <form id="form-movimiento">
-                                        <div class="row mb-3">
-                                            <div class="col-md-4">
-                                                <label class="form-label fw-semibold">Tipo</label>
-                                                <select id="tipo" class="form-select" required>
-                                                    <option value="entrada">Entrada</option>
-                                                    <option value="salida">Salida</option>
-                                                </select>
-                                            </div>
-                                            <div class="col-md-4 mt-3 mt-md-0">
-                                                <label class="form-label fw-semibold">Fecha</label>
-                                                <input type="date" id="fecha-mov" class="form-control" required>
-                                            </div>
-                                            <div class="col-md-4 mt-3 mt-md-0">
-                                                <label class="form-label fw-semibold text-primary">Método de
-                                                    Pago</label>
-                                                <select id="metodo-pago-mov" class="form-select border-primary"
-                                                    required>
-                                                    <option value="Efectivo">Efectivo</option>
-                                                    <option value="Sinpe Móvil">Sinpe Móvil</option>
-                                                    <option value="Transferencia">Transferencia</option>
-                                                </select>
-                                            </div>
+            <!-- VISTA 3: REGISTRO FINANCIERO MANUAL -->
+            <div id="vista-registro" class="view-section">
+                <div class="row justify-content-center">
+                    <div class="col-md-8">
+                        <div class="card shadow-sm mb-5 border-0">
+                            <div class="card-header bg-success text-white fw-bold">Registrar Movimiento Manual en
+                                Caja
+                            </div>
+                            <div class="card-body">
+                                <form id="form-movimiento">
+                                    <div class="row mb-3">
+                                        <div class="col-md-4">
+                                            <label class="form-label fw-semibold">Tipo</label>
+                                            <select id="tipo" class="form-select" required>
+                                                <option value="entrada">Entrada</option>
+                                                <option value="salida">Salida</option>
+                                            </select>
                                         </div>
-                                        <div class="mb-3"><label class="form-label fw-semibold">Concepto</label><input
-                                                type="text" id="descripcion-mov" class="form-control" required></div>
-                                        <div class="row mb-3">
-                                            <div class="col-md-6"><label class="form-label fw-semibold">Entidad /
-                                                    Local</label><input type="text" id="entidad-mov"
-                                                    class="form-control">
-                                            </div>
-                                            <div class="col-md-6 mt-3 mt-md-0"><label
-                                                    class="form-label fw-semibold">Monto
-                                                    (₡)</label><input type="number" id="monto-mov" class="form-control"
-                                                    required min="1" step="0.01"></div>
+                                        <div class="col-md-4 mt-3 mt-md-0">
+                                            <label class="form-label fw-semibold">Fecha</label>
+                                            <input type="date" id="fecha-mov" class="form-control" required>
                                         </div>
-                                        <button type="submit"
-                                            class="btn btn-success w-100 py-2 fw-bold shadow-sm">Guardar
-                                            en Caja</button>
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- VISTA 4: REPORTES FINANCIEROS -->
-                <div id="vista-reportes" class="view-section">
-                    <div class="row mb-4 justify-content-center" id="contenedor-resumen">
-                        <div class="col-md-4 mb-3">
-                            <div class="card text-bg-success shadow-sm text-center h-100">
-                                <div class="card-body">
-                                    <h6>Entradas</h6>
-                                    <h3 id="resumen-entradas">₡0</h3>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <div class="card text-bg-danger shadow-sm text-center h-100">
-                                <div class="card-body">
-                                    <h6>Salidas</h6>
-                                    <h3 id="resumen-salidas">₡0</h3>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <div class="card text-bg-info text-white shadow-sm text-center h-100">
-                                <div class="card-body">
-                                    <h6>Balance Neto</h6>
-                                    <h3 id="resumen-balance">₡0</h3>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-lg-4 mb-4">
-                            <div class="card shadow-sm h-100 border-0">
-                                <div class="card-header bg-white fw-bold">Filtros</div>
-                                <div class="card-body">
-                                    <div class="mb-2"><select id="filtro-modo" class="form-select form-select-sm">
-                                            <option value="ambos">Ver Todo</option>
-                                            <option value="entradas">Solo Entradas</option>
-                                            <option value="salidas">Solo Salidas</option>
-                                        </select></div>
-                                    <div class="mb-2"><input type="date" id="filtro-inicio"
-                                            class="form-control form-control-sm"></div>
-                                    <div class="mb-3"><input type="date" id="filtro-fin"
-                                            class="form-control form-control-sm"></div>
-                                    <div class="d-flex justify-content-center align-items-center mt-4"><canvas
-                                            id="miGrafico" style="max-height: 250px;"></canvas></div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-lg-8 mb-4">
-                            <div class="card shadow-sm h-100 border-0">
-                                <div
-                                    class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
-                                    <span>Libro Diario</span>
-                                    <div><button id="btn-export-pdf" class="btn btn-sm btn-danger px-2">PDF</button>
-                                        <button id="btn-export-excel" class="btn btn-sm btn-success px-2">Excel</button>
+                                        <div class="col-md-4 mt-3 mt-md-0">
+                                            <label class="form-label fw-semibold text-primary">Método de
+                                                Pago</label>
+                                            <select id="metodo-pago-mov" class="form-select border-primary" required>
+                                                <option value="Efectivo">Efectivo</option>
+                                                <option value="Sinpe Móvil">Sinpe Móvil</option>
+                                                <option value="Transferencia">Transferencia</option>
+                                            </select>
+                                        </div>
                                     </div>
-                                </div>
-                                <div class="card-body table-responsive p-0"
-                                    style="max-height: 450px; overflow-y: auto;">
-                                    <table class="table table-hover align-middle m-0 text-nowrap">
-                                        <thead class="table-light sticky-top shadow-sm">
-                                            <tr>
-                                                <th>Fecha</th>
-                                                <th>Detalle / Método</th>
-                                                <th>Monto</th>
-                                                <th class="text-center">Acciones</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="tabla-reportes"></tbody>
-                                        <!-- Aquí termina tu tabla actual -->
-                                    </table>
-
-                                    <!-- NUEVO: BOTÓN CARGAR MÁS (Pegar justo aquí) -->
-                                    <div class="text-center p-3 border-top bg-light rounded-bottom">
-                                        <button id="btn-cargar-mas-finanzas"
-                                            class="btn btn-outline-secondary btn-sm rounded-pill px-4 fw-bold shadow-sm">
-                                            <i class="fas fa-arrow-down me-1"></i> Cargar más antiguos
-                                        </button>
+                                    <div class="mb-3"><label class="form-label fw-semibold">Concepto</label><input
+                                            type="text" id="descripcion-mov" class="form-control" required></div>
+                                    <div class="row mb-3">
+                                        <div class="col-md-6"><label class="form-label fw-semibold">Entidad /
+                                                Local</label><input type="text" id="entidad-mov" class="form-control">
+                                        </div>
+                                        <div class="col-md-6 mt-3 mt-md-0"><label class="form-label fw-semibold">Monto
+                                                (₡)</label><input type="number" id="monto-mov" class="form-control"
+                                                required min="1" step="0.01"></div>
                                     </div>
-                                    <!-- Fin del botón -->
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- VISTA 5: DASHBOARD BI -->
-                <div id="vista-dashboard" class="view-section">
-                    <h2 class="mb-4">Inteligencia de Negocios (BI)</h2>
-
-                    <!-- 1. UTILIDAD NETA (NUEVO) -->
-                    <div class="row mb-4">
-                        <div class="col-12">
-                            <div class="card border-success shadow-sm">
-                                <div class="card-body text-center bg-light">
-                                    <h5 class="card-title text-success fw-bold">Utilidad Neta (Mes Actual)</h5>
-                                    <h2 id="bi-utilidad-neta" class="fw-bold mb-1">₡0</h2>
-                                    <small id="bi-utilidad-detalle" class="text-muted">Calculando...</small>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <!-- CRM: Mejores Clientes -->
-                        <div class="col-md-6 mb-4">
-                            <div class="card shadow-sm h-100">
-                                <div class="card-body">
-                                    <h5 class="card-title">Top 5 Clientes Históricos</h5>
-                                    <ol id="lista-crm-clientes" class="list-group list-group-numbered mt-3"></ol>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Volatilidad -->
-                        <div class="col-md-6 mb-4">
-                            <div class="card shadow-sm h-100">
-                                <div class="card-body text-center">
-                                    <h5 class="card-title">Análisis de Riesgo y Volatilidad</h5>
-                                    <div id="alerta-volatilidad" class="alert alert-secondary py-2 mb-3 mt-3 fw-bold">
-                                        Analizando...</div>
-                                    <div class="d-flex justify-content-around mb-2">
-                                        <div><small class="text-muted d-block">Promedio Mensual</small><strong
-                                                id="stat-media">N/A</strong></div>
-                                        <div><small class="text-muted d-block">Desviación (Riesgo)</small><strong
-                                                id="stat-desv">N/A</strong></div>
-                                    </div>
-                                    <p id="stat-recomendacion" class="small text-muted mt-3 mb-0"></p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <!-- Tasa de Retención (NUEVO) -->
-                        <div class="col-md-4 mb-4">
-                            <div class="card shadow-sm h-100">
-                                <div class="card-body">
-                                    <h5 class="card-title text-center">Retención vs Cancelación</h5>
-                                    <div style="position: relative; height: 220px; width: 100%;">
-                                        <canvas id="graficoRetencion"></canvas>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Estacionalidad de Productos -->
-                        <div class="col-md-4 mb-4">
-                            <div class="card shadow-sm h-100">
-                                <div class="card-body">
-                                    <h5 class="card-title text-center">Productos más vendidos</h5>
-                                    <div style="position: relative; height: 220px; width: 100%;">
-                                        <canvas id="graficoEstacionalidad"></canvas>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Distribución de Gastos (NUEVO) -->
-                        <div class="col-md-4 mb-4">
-                            <div class="card shadow-sm h-100">
-                                <div class="card-body">
-                                    <h5 class="card-title text-center">Fuga de Capital (Gastos)</h5>
-                                    <div style="position: relative; height: 220px; width: 100%;">
-                                        <canvas id="graficoGastos"></canvas>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Módulo de Métricas Avanzadas (NUEVO) -->
-                    <div class="col-12 mt-4 mb-4">
-                        <div class="card shadow-sm border-0">
-                            <div class="card-header bg-dark text-white fw-bold"><i class="fas fa-microscope"></i>
-                                Radiografía del Negocio</div>
-                            <div class="card-body" id="bi-metricas-avanzadas">
-                                <!-- El JS inyectará el análisis aquí -->
+                                    <button type="submit" class="btn btn-success w-100 py-2 fw-bold shadow-sm">Guardar
+                                        en Caja</button>
+                                </form>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- PLANTILLA OCULTA PARA EL RECIBO/TICKET DE IMAGEN -->
-            <div id="ticket-template">
-                <div class="ticket-header">
-                    <img src="logo-masucri.png" alt="MASUCRI">
-                    <h2>MASUCRI</h2>
-                    <p>Confecciones y sublimación</p>
+            <!-- VISTA 4: REPORTES FINANCIEROS -->
+            <div id="vista-reportes" class="view-section">
+                <div class="row mb-4 justify-content-center" id="contenedor-resumen">
+                    <div class="col-md-4 mb-3">
+                        <div class="card text-bg-success shadow-sm text-center h-100">
+                            <div class="card-body">
+                                <h6>Entradas</h6>
+                                <h3 id="resumen-entradas">₡0</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card text-bg-danger shadow-sm text-center h-100">
+                            <div class="card-body">
+                                <h6>Salidas</h6>
+                                <h3 id="resumen-salidas">₡0</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card text-bg-info text-white shadow-sm text-center h-100">
+                            <div class="card-body">
+                                <h6>Balance Neto</h6>
+                                <h3 id="resumen-balance">₡0</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-lg-4 mb-4">
+                        <div class="card shadow-sm h-100 border-0">
+                            <div class="card-header bg-white fw-bold">Filtros</div>
+                            <div class="card-body">
+                                <div class="mb-2"><select id="filtro-modo" class="form-select form-select-sm">
+                                        <option value="ambos">Ver Todo</option>
+                                        <option value="entradas">Solo Entradas</option>
+                                        <option value="salidas">Solo Salidas</option>
+                                    </select></div>
+                                <div class="mb-2"><input type="date" id="filtro-inicio"
+                                        class="form-control form-control-sm"></div>
+                                <div class="mb-3"><input type="date" id="filtro-fin"
+                                        class="form-control form-control-sm"></div>
+                                <div class="d-flex justify-content-center align-items-center mt-4"><canvas
+                                        id="miGrafico" style="max-height: 250px;"></canvas></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-8 mb-4">
+                        <div class="card shadow-sm h-100 border-0">
+                            <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
+                                <span>Libro Diario</span>
+                                <div><button id="btn-export-pdf" class="btn btn-sm btn-danger px-2">PDF</button>
+                                    <button id="btn-export-excel" class="btn btn-sm btn-success px-2">Excel</button>
+                                </div>
+                            </div>
+                            <div class="card-body table-responsive p-0" style="max-height: 450px; overflow-y: auto;">
+                                <table class="table table-hover align-middle m-0 text-nowrap">
+                                    <thead class="table-light sticky-top shadow-sm">
+                                        <tr>
+                                            <th>Fecha</th>
+                                            <th>Detalle / Método</th>
+                                            <th>Monto</th>
+                                            <th class="text-center">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tabla-reportes"></tbody>
+                                    <!-- Aquí termina tu tabla actual -->
+                                </table>
+
+                                <!-- NUEVO: BOTÓN CARGAR MÁS (Pegar justo aquí) -->
+                                <div class="text-center p-3 border-top bg-light rounded-bottom">
+                                    <button id="btn-cargar-mas-finanzas"
+                                        class="btn btn-outline-secondary btn-sm rounded-pill px-4 fw-bold shadow-sm">
+                                        <i class="fas fa-arrow-down me-1"></i> Cargar más antiguos
+                                    </button>
+                                </div>
+                                <!-- Fin del botón -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VISTA 5: DASHBOARD BI -->
+            <div id="vista-dashboard" class="view-section">
+                <h2 class="mb-4">Inteligencia de Negocios (BI)</h2>
+
+                <!-- 1. UTILIDAD NETA (NUEVO) -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card border-success shadow-sm">
+                            <div class="card-body text-center bg-light">
+                                <h5 class="card-title text-success fw-bold">Utilidad Neta (Mes Actual)</h5>
+                                <h2 id="bi-utilidad-neta" class="fw-bold mb-1">₡0</h2>
+                                <small id="bi-utilidad-detalle" class="text-muted">Calculando...</small>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="ticket-body">
-                    <p><strong>Fecha:</strong> <span id="tkt-fecha"></span></p>
-                    <p><strong>Cliente:</strong> <span id="tkt-cliente"></span></p>
-                    <p><strong>Detalle:</strong> <span id="tkt-producto"></span></p>
+                <div class="row">
+                    <!-- CRM: Mejores Clientes -->
+                    <div class="col-md-6 mb-4">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">Top 5 Clientes Históricos</h5>
+                                <ol id="lista-crm-clientes" class="list-group list-group-numbered mt-3"></ol>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Volatilidad -->
+                    <div class="col-md-6 mb-4">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-body text-center">
+                                <h5 class="card-title">Análisis de Riesgo y Volatilidad</h5>
+                                <div id="alerta-volatilidad" class="alert alert-secondary py-2 mb-3 mt-3 fw-bold">
+                                    Analizando...</div>
+                                <div class="d-flex justify-content-around mb-2">
+                                    <div><small class="text-muted d-block">Promedio Mensual</small><strong
+                                            id="stat-media">N/A</strong></div>
+                                    <div><small class="text-muted d-block">Desviación (Riesgo)</small><strong
+                                            id="stat-desv">N/A</strong></div>
+                                </div>
+                                <p id="stat-recomendacion" class="small text-muted mt-3 mb-0"></p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
+
+                <div class="row">
+                    <!-- Tasa de Retención (NUEVO) -->
+                    <div class="col-md-4 mb-4">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-body">
+                                <h5 class="card-title text-center">Retención vs Cancelación</h5>
+                                <div style="position: relative; height: 220px; width: 100%;">
+                                    <canvas id="graficoRetencion"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Estacionalidad de Productos -->
+                    <div class="col-md-4 mb-4">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-body">
+                                <h5 class="card-title text-center">Productos más vendidos</h5>
+                                <div style="position: relative; height: 220px; width: 100%;">
+                                    <canvas id="graficoEstacionalidad"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Distribución de Gastos (NUEVO) -->
+                    <div class="col-md-4 mb-4">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-body">
+                                <h5 class="card-title text-center">Fuga de Capital (Gastos)</h5>
+                                <div style="position: relative; height: 220px; width: 100%;">
+                                    <canvas id="graficoGastos"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Módulo de Métricas Avanzadas (NUEVO) -->
+                <div class="col-12 mt-4 mb-4">
+                    <div class="card shadow-sm border-0">
+                        <div class="card-header bg-dark text-white fw-bold"><i class="fas fa-microscope"></i>
+                            Radiografía del Negocio</div>
+                        <div class="card-body" id="bi-metricas-avanzadas">
+                            <!-- El JS inyectará el análisis aquí -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PLANTILLA OCULTA PARA EL RECIBO/TICKET DE IMAGEN -->
+        <div id="ticket-template">
+            <div class="ticket-header">
+                <img src="logo-masucri.png" alt="MASUCRI">
+                <h2>MASUCRI</h2>
+                <p>Confecciones y sublimación</p>
+            </div>
+
+            <div class="ticket-body">
+                <p><strong>Fecha:</strong> <span id="tkt-fecha"></span></p>
+                <p><strong>Cliente:</strong> <span id="tkt-cliente"></span></p>
+                <p><strong>Detalle:</strong> <span id="tkt-producto"></span></p>
+            </div>
+
+            <div class="ticket-row">
+                <span>Comprobante N°:</span>
+                <strong id="tkt-consecutivo"></strong>
+            </div>
+
+            <div class="ticket-caja">
+                <h4 style="text-align: center; margin: 0 0 15px 0;">ESTADO DE CUENTA</h4>
 
                 <div class="ticket-row">
-                    <span>Comprobante N°:</span>
-                    <strong id="tkt-consecutivo"></strong>
+                    <span>Total del Trabajo:</span>
+                    <strong id="tkt-precio-total"></strong>
+                </div>
+                <div class="ticket-row">
+                    <span>Saldo Anterior:</span>
+                    <strong id="tkt-anterior"></strong>
+                </div>
+                <div class="ticket-row" style="color: #198754; font-weight: bold;">
+                    <span>Total Pagado:</span>
+                    <strong id="tkt-abono"></strong>
+                </div>
+                <div class="ticket-row">
+                    <span>Método de Pago:</span>
+                    <strong id="tkt-metodo"></strong>
                 </div>
 
-                <div class="ticket-caja">
-                    <h4 style="text-align: center; margin: 0 0 15px 0;">ESTADO DE CUENTA</h4>
-
-                    <div class="ticket-row">
-                        <span>Total del Trabajo:</span>
-                        <strong id="tkt-precio-total"></strong>
-                    </div>
-                    <div class="ticket-row">
-                        <span>Saldo Anterior:</span>
-                        <strong id="tkt-anterior"></strong>
-                    </div>
-                    <div class="ticket-row" style="color: #198754; font-weight: bold;">
-                        <span>Total Pagado:</span>
-                        <strong id="tkt-abono"></strong>
-                    </div>
-                    <div class="ticket-row">
-                        <span>Método de Pago:</span>
-                        <strong id="tkt-metodo"></strong>
-                    </div>
-
-                    <div class="ticket-total">
-                        <span>SALDO RESTANTE:</span>
-                        <strong id="tkt-saldo"></strong>
-                    </div>
-                </div>
-
-                <div class="ticket-footer">
-                    <span id="tkt-estado" class="badge-estado"></span>
-                    <p style="margin-top: 20px; font-size: 14px; color: #555;">Gracias por preferir a MASUCRI</p>
+                <div class="ticket-total">
+                    <span>SALDO RESTANTE:</span>
+                    <strong id="tkt-saldo"></strong>
                 </div>
             </div>
 
-            <!-- MODAL: NUEVO / EDITAR PEDIDO -->
-            <div class="modal fade" id="modalPedido" tabindex="-1" data-bs-backdrop="static">
-                <div class="modal-dialog">
-                    <div class="modal-content border-0 shadow">
-                        <div class="modal-header bg-primary text-white">
-                            <h5 class="modal-title fw-bold" id="tituloModalPedido">Nuevo Pedido</h5>
-                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div class="modal-body">
-                            <form id="form-pedido">
-                                <input type="hidden" id="ped-id">
-                                <div class="row mb-3">
-                                    <div class="col-6">
-                                        <label class="form-label fw-semibold text-muted small">Fecha Solicitud</label>
-                                        <input type="date" id="ped-solicitado" class="form-control" required readonly>
-                                    </div>
-                                    <div class="col-6">
-                                        <label class="form-label fw-bold text-primary small">Fecha de Entrega</label>
-                                        <input type="date" id="ped-entrega" class="form-control border-primary">
-                                    </div>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Nombre del Cliente</label>
-                                    <input type="text" id="ped-cliente" class="form-control" required
-                                        placeholder="Ej: Juan Pérez">
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Teléfono del Cliente (Opcional)</label>
-                                    <div class="input-group">
-                                        <input type="text" id="ped-telefono" class="form-control border-secondary"
-                                            placeholder="Ej: 88888888">
-                                        <button type="button" class="btn btn-outline-secondary" id="btn-contactos"
-                                            title="Elegir desde agenda">
-                                            Buscar Contacto
-                                        </button>
-                                    </div>
-                                    <small class="text-muted">Se usará para identificar compras recurrentes en el
-                                        BI.</small>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Producto / Trabajo</label>
-                                    <input type="text" id="ped-producto" class="form-control" list="catalogo-productos"
-                                        required placeholder="Ej: Camiseta Sublimada">
-                                    <datalist id="catalogo-productos"></datalist>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Descripción o Notas Adicionales</label>
-                                    <textarea id="ped-desc" class="form-control" rows="2"
-                                        placeholder="Ej: Talla M, color azul"></textarea>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label fw-bold">Precio Total (Opcional)</label>
-                                    <input type="number" id="ped-precio" class="form-control bg-light" min="0"
-                                        step="0.01" placeholder="Ej: 15000">
-                                </div>
-                                <!-- Sección de Adelanto (NUEVO) -->
-                                <div class="row mb-3 p-3 bg-light rounded border">
-                                    <div class="col-12 mb-2">
-                                        <span class="fw-bold text-success"><i class="fas fa-coins"></i> ¿El cliente dejó
-                                            un
-                                            adelanto? (Opcional)</span>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label text-muted small">Monto (₡)</label>
-                                        <input type="number" id="ped-adelanto" class="form-control border-success"
-                                            placeholder="Ej: 3000">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label text-muted small">Método del Adelanto</label>
-                                        <select id="ped-metodo-adelanto" class="form-select border-success">
-                                            <option value="Sinpe Móvil">Sinpe Móvil</option>
-                                            <option value="Efectivo">Efectivo</option>
-                                            <option value="Transferencia">Transferencia</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-12 mt-2">
-                                        <small class="text-muted" style="font-size: 0.75rem;">* El adelanto se
-                                            registrará en
-                                            caja automáticamente y se restará del total al entregar.</small>
-                                    </div>
-                                </div>
-                                <button type="submit" class="btn btn-primary w-100 fw-bold shadow-sm">Guardar
-                                    Pedido</button>
-                            </form>
-                        </div>
-                    </div>
-                </div>
+            <div class="ticket-footer">
+                <span id="tkt-estado" class="badge-estado"></span>
+                <p style="margin-top: 20px; font-size: 14px; color: #555;">Gracias por preferir a MASUCRI</p>
             </div>
+        </div>
 
-            <!-- Modal Editar Movimiento -->
-            <div class="modal fade" id="modalEditarMov" tabindex="-1" aria-hidden="true">
-                <div class="modal-dialog">
-                    <div class="modal-content border-primary">
-                        <div class="modal-header bg-primary text-white">
-                            <h5 class="modal-title">Editar Movimiento</h5>
-                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
-                                aria-label="Close"></button>
-                        </div>
-                        <div class="modal-body">
-                            <form id="form-editar-mov">
-                                <input type="hidden" id="edit-id-mov">
-                                <div class="mb-3">
-                                    <label class="fw-bold">Tipo de Movimiento</label>
-                                    <select id="edit-tipo-mov" class="form-select border-primary" required>
-                                        <option value="entrada">Entrada (Ingreso)</option>
-                                        <option value="salida">Salida (Gasto)</option>
-                                    </select>
+        <!-- MODAL: NUEVO / EDITAR PEDIDO -->
+        <div class="modal fade" id="modalPedido" tabindex="-1" data-bs-backdrop="static">
+            <div class="modal-dialog">
+                <div class="modal-content border-0 shadow">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title fw-bold" id="tituloModalPedido">Nuevo Pedido</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="form-pedido">
+                            <input type="hidden" id="ped-id">
+                            <div class="row mb-3">
+                                <div class="col-6">
+                                    <label class="form-label fw-semibold text-muted small">Fecha Solicitud</label>
+                                    <input type="date" id="ped-solicitado" class="form-control" required readonly>
                                 </div>
-                                <div class="mb-3">
-                                    <label class="fw-bold">Fecha</label>
-                                    <input type="date" id="edit-fecha-mov" class="form-control" required>
+                                <div class="col-6">
+                                    <label class="form-label fw-bold text-primary small">Fecha de Entrega</label>
+                                    <input type="date" id="ped-entrega" class="form-control border-primary">
                                 </div>
-                                <div class="mb-3">
-                                    <label class="fw-bold">Concepto / Descripción</label>
-                                    <input type="text" id="edit-desc-mov" class="form-control" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Nombre del Cliente</label>
+                                <input type="text" id="ped-cliente" class="form-control" required
+                                    placeholder="Ej: Juan Pérez">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Teléfono del Cliente (Opcional)</label>
+                                <div class="input-group">
+                                    <input type="text" id="ped-telefono" class="form-control border-secondary"
+                                        placeholder="Ej: 88888888">
+                                    <button type="button" class="btn btn-outline-secondary" id="btn-contactos"
+                                        title="Elegir desde agenda">
+                                        Buscar Contacto
+                                    </button>
                                 </div>
-                                <div class="mb-3">
-                                    <label class="fw-bold">Entidad / Cliente (Opcional)</label>
-                                    <input type="text" id="edit-ent-mov" class="form-control">
+                                <small class="text-muted">Se usará para identificar compras recurrentes en el
+                                    BI.</small>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Producto / Trabajo</label>
+                                <input type="text" id="ped-producto" class="form-control" list="catalogo-productos"
+                                    required placeholder="Ej: Camiseta Sublimada">
+                                <datalist id="catalogo-productos"></datalist>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Descripción o Notas Adicionales</label>
+                                <textarea id="ped-desc" class="form-control" rows="2"
+                                    placeholder="Ej: Talla M, color azul"></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Precio Total (Opcional)</label>
+                                <input type="number" id="ped-precio" class="form-control bg-light" min="0" step="0.01"
+                                    placeholder="Ej: 15000">
+                            </div>
+                            <!-- Sección de Adelanto (NUEVO) -->
+                            <div class="row mb-3 p-3 bg-light rounded border">
+                                <div class="col-12 mb-2">
+                                    <span class="fw-bold text-success"><i class="fas fa-coins"></i> ¿El cliente dejó
+                                        un
+                                        adelanto? (Opcional)</span>
                                 </div>
-                                <div class="mb-3">
-                                    <label class="fw-bold">Método de Pago</label>
-                                    <select id="edit-metodo-mov" class="form-select">
-                                        <option value="Efectivo">Efectivo</option>
+                                <div class="col-md-6">
+                                    <label class="form-label text-muted small">Monto (₡)</label>
+                                    <input type="number" id="ped-adelanto" class="form-control border-success"
+                                        placeholder="Ej: 3000">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label text-muted small">Método del Adelanto</label>
+                                    <select id="ped-metodo-adelanto" class="form-select border-success">
                                         <option value="Sinpe Móvil">Sinpe Móvil</option>
+                                        <option value="Efectivo">Efectivo</option>
                                         <option value="Transferencia">Transferencia</option>
                                     </select>
                                 </div>
-                                <div class="mb-3">
-                                    <label class="fw-bold">Monto (₡)</label>
-                                    <input type="number" id="edit-monto-mov" class="form-control border-primary"
-                                        required>
+                                <div class="col-12 mt-2">
+                                    <small class="text-muted" style="font-size: 0.75rem;">* El adelanto se
+                                        registrará en
+                                        caja automáticamente y se restará del total al entregar.</small>
                                 </div>
-                                <div class="text-end mt-4">
-                                    <button type="submit" class="btn btn-primary w-100">Guardar Cambios</button>
-                                </div>
-                            </form>
-                        </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100 fw-bold shadow-sm">Guardar
+                                Pedido</button>
+                        </form>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <!-- Modal Detalle de Pedido Unificado -->
-            <div class="modal fade" id="modalDetallePedido" tabindex="-1">
-                <div class="modal-dialog modal-dialog-centered">
-                    <div class="modal-content border-0 shadow">
-                        <div class="modal-header bg-light">
-                            <h5 class="modal-title fw-bold text-dark"><i class="fas fa-file-invoice"></i> Detalle del
-                                Pedido
-                            </h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div class="modal-body p-0" id="detalle-pedido-body">
-                            <!-- JS inyecta el contenido -->
-                        </div>
-                        <div class="modal-footer justify-content-center bg-light gap-2" id="detalle-pedido-footer">
-                            <!-- JS inyecta los botones según el estado -->
-                        </div>
+        <!-- Modal Editar Movimiento -->
+        <div class="modal fade" id="modalEditarMov" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content border-primary">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title">Editar Movimiento</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                            aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="form-editar-mov">
+                            <input type="hidden" id="edit-id-mov">
+                            <div class="mb-3">
+                                <label class="fw-bold">Tipo de Movimiento</label>
+                                <select id="edit-tipo-mov" class="form-select border-primary" required>
+                                    <option value="entrada">Entrada (Ingreso)</option>
+                                    <option value="salida">Salida (Gasto)</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="fw-bold">Fecha</label>
+                                <input type="date" id="edit-fecha-mov" class="form-control" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="fw-bold">Concepto / Descripción</label>
+                                <input type="text" id="edit-desc-mov" class="form-control" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="fw-bold">Entidad / Cliente (Opcional)</label>
+                                <input type="text" id="edit-ent-mov" class="form-control">
+                            </div>
+                            <div class="mb-3">
+                                <label class="fw-bold">Método de Pago</label>
+                                <select id="edit-metodo-mov" class="form-select">
+                                    <option value="Efectivo">Efectivo</option>
+                                    <option value="Sinpe Móvil">Sinpe Móvil</option>
+                                    <option value="Transferencia">Transferencia</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="fw-bold">Monto (₡)</label>
+                                <input type="number" id="edit-monto-mov" class="form-control border-primary" required>
+                            </div>
+                            <div class="text-end mt-4">
+                                <button type="submit" class="btn btn-primary w-100">Guardar Cambios</button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <!-- MODAL: VENTA RÁPIDA -->
-            <div class="modal fade" id="modalVentaRapida" tabindex="-1" data-bs-backdrop="static">
-                <div class="modal-dialog">
-                    <div class="modal-content border-0 shadow">
-                        <div class="modal-header bg-warning text-dark">
-                            <h5 class="modal-title fw-bold"><i class="fas fa-bolt"></i> Venta Rápida / Entrega Inmediata
-                            </h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div class="modal-body">
-                            <form id="form-venta-rapida">
-                                <div class="row mb-3">
-                                    <div class="col-6">
-                                        <label class="form-label small text-muted">Fecha</label>
-                                        <input type="date" id="vr-fecha" class="form-control" required readonly>
-                                    </div>
-                                    <div class="col-6">
-                                        <label class="form-label small text-muted">Teléfono (Opcional)</label>
-                                        <input type="text" id="vr-telefono" class="form-control"
-                                            placeholder="Ej: 88888888">
-                                    </div>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label fw-bold">Cliente</label>
-                                    <input type="text" id="vr-cliente" class="form-control" required
-                                        placeholder="Nombre del cliente o 'Cliente de mostrador'">
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label fw-bold">Producto</label>
-                                    <input type="text" id="vr-producto" class="form-control" list="catalogo-productos"
-                                        required placeholder="Ej: Llavero de resina">
-                                </div>
-                                <div class="row mb-3 bg-light p-2 rounded border">
-                                    <div class="col-6">
-                                        <label class="form-label fw-bold text-primary">Precio Total (₡)</label>
-                                        <input type="number" id="vr-precio" class="form-control border-primary" required
-                                            min="1" step="0.01">
-                                    </div>
-                                    <div class="col-6">
-                                        <label class="form-label fw-bold text-success">Monto Pagado Hoy (₡)</label>
-                                        <input type="number" id="vr-pagado" class="form-control border-success" required
-                                            min="0" step="0.01">
-                                    </div>
-                                    <div class="col-12 mt-2">
-                                        <small class="text-muted d-block mb-1">Si no paga el total, irá al Historial
-                                            como
-                                            deuda.</small>
-                                        <select id="vr-metodo" class="form-select border-success form-select-sm">
-                                            <option value="Efectivo">Pago en Efectivo</option>
-                                            <option value="Sinpe Móvil">Pago por Sinpe Móvil</option>
-                                            <option value="Transferencia">Pago por Transferencia</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <button type="submit" class="btn btn-warning w-100 fw-bold shadow-sm text-dark"><i
-                                        class="fas fa-check"></i> Registrar Venta</button>
-                            </form>
-                        </div>
+        <!-- Modal Detalle de Pedido Unificado -->
+        <div class="modal fade" id="modalDetallePedido" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow">
+                    <div class="modal-header bg-light">
+                        <h5 class="modal-title fw-bold text-dark"><i class="fas fa-file-invoice"></i> Detalle del
+                            Pedido
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body p-0" id="detalle-pedido-body">
+                        <!-- JS inyecta el contenido -->
+                    </div>
+                    <div class="modal-footer justify-content-center bg-light gap-2" id="detalle-pedido-footer">
+                        <!-- JS inyecta los botones según el estado -->
                     </div>
                 </div>
             </div>
+        </div>
 
-            <!-- BOTÓN FLOTANTE PARA SUBIR -->
-            <button id="btn-scroll-top" class="btn btn-primary rounded-circle shadow d-none"
-                style="position: fixed; bottom: 20px; right: 20px; z-index: 1050; width: 50px; height: 50px; align-items: center; justify-content: center;"
-                title="Volver arriba">
-                <i class="fas fa-arrow-up fs-5"></i>
-            </button>
-
-            <!-- CONTENEDOR DEL TOAST (NOTIFICACIÓN EN LA ESQUINA) -->
-            <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1100;">
-                <div id="toast-notificacion" class="toast shadow-lg border-0" role="alert" aria-live="assertive"
-                    aria-atomic="true">
-                    <div class="toast-header bg-warning text-dark border-0">
-                        <i class="fas fa-bell me-2"></i>
-                        <strong class="me-auto fw-bold">Alertas MASUCRI</strong>
-                        <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+        <!-- MODAL: VENTA RÁPIDA -->
+        <div class="modal fade" id="modalVentaRapida" tabindex="-1" data-bs-backdrop="static">
+            <div class="modal-dialog">
+                <div class="modal-content border-0 shadow">
+                    <div class="modal-header bg-warning text-dark">
+                        <h5 class="modal-title fw-bold"><i class="fas fa-bolt"></i> Venta Rápida / Entrega Inmediata
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
-                    <div class="toast-body bg-white text-dark fw-semibold" id="toast-body-texto">
-                        <!-- JS inyecta el texto aquí -->
+                    <div class="modal-body">
+                        <form id="form-venta-rapida">
+                            <div class="row mb-3">
+                                <div class="col-6">
+                                    <label class="form-label small text-muted">Fecha</label>
+                                    <input type="date" id="vr-fecha" class="form-control" required readonly>
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small text-muted">Teléfono (Opcional)</label>
+                                    <input type="text" id="vr-telefono" class="form-control" placeholder="Ej: 88888888">
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Cliente</label>
+                                <input type="text" id="vr-cliente" class="form-control" required
+                                    placeholder="Nombre del cliente o 'Cliente de mostrador'">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Producto</label>
+                                <input type="text" id="vr-producto" class="form-control" list="catalogo-productos"
+                                    required placeholder="Ej: Llavero de resina">
+                            </div>
+                            <div class="row mb-3 bg-light p-2 rounded border">
+                                <div class="col-6">
+                                    <label class="form-label fw-bold text-primary">Precio Total (₡)</label>
+                                    <input type="number" id="vr-precio" class="form-control border-primary" required
+                                        min="1" step="0.01">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label fw-bold text-success">Monto Pagado Hoy (₡)</label>
+                                    <input type="number" id="vr-pagado" class="form-control border-success" required
+                                        min="0" step="0.01">
+                                </div>
+                                <div class="col-12 mt-2">
+                                    <small class="text-muted d-block mb-1">Si no paga el total, irá al Historial
+                                        como
+                                        deuda.</small>
+                                    <select id="vr-metodo" class="form-select border-success form-select-sm">
+                                        <option value="Efectivo">Pago en Efectivo</option>
+                                        <option value="Sinpe Móvil">Pago por Sinpe Móvil</option>
+                                        <option value="Transferencia">Pago por Transferencia</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-warning w-100 fw-bold shadow-sm text-dark"><i
+                                    class="fas fa-check"></i> Registrar Venta</button>
+                        </form>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-            <script type="module" src="app.js"></script>
+        <!-- BOTÓN FLOTANTE PARA SUBIR -->
+        <button id="btn-scroll-top" class="btn btn-primary rounded-circle shadow d-none"
+            style="position: fixed; bottom: 20px; right: 20px; z-index: 1050; width: 50px; height: 50px; align-items: center; justify-content: center;"
+            title="Volver arriba">
+            <i class="fas fa-arrow-up fs-5"></i>
+        </button>
+
+        <!-- CONTENEDOR DEL TOAST (NOTIFICACIÓN EN LA ESQUINA) -->
+        <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1100;">
+            <div id="toast-notificacion" class="toast shadow-lg border-0" role="alert" aria-live="assertive"
+                aria-atomic="true">
+                <div class="toast-header bg-warning text-dark border-0">
+                    <i class="fas fa-bell me-2"></i>
+                    <strong class="me-auto fw-bold">Alertas MASUCRI</strong>
+                    <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+                </div>
+                <div class="toast-body bg-white text-dark fw-semibold" id="toast-body-texto">
+                    <!-- JS inyecta el texto aquí -->
+                </div>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+        <script type="module" src="app.js"></script>
 </body>
 
 </html>
