@@ -332,9 +332,14 @@ class PedidosSystem {
         if (!UIManager.vistas.historial.classList.contains('active')) return;
         let historial = Estado.pedidos.filter(p => !this.estadosActivos.includes(p.estado)).sort((a, b) => new Date(b.fecha_cierre) - new Date(a.fecha_cierre));
         const filtro = document.getElementById('filtro-historial').value;
+        const filtroTexto = document.getElementById('filtro-historial-texto') ? document.getElementById('filtro-historial-texto').value.toLowerCase() : '';
+
         if (filtro === 'con_saldo') historial = historial.filter(p => p.estado === 'Entregado' && (p.precio - (p.monto_pagado || 0)) > 0);
         else if (filtro === 'entregados') historial = historial.filter(p => p.estado === 'Entregado' && (p.precio - (p.monto_pagado || 0)) <= 0);
         else if (filtro === 'anulados') historial = historial.filter(p => p.estado === 'Cancelado');
+
+        // NUEVO: Filtro por texto en historial
+        if (filtroTexto) historial = historial.filter(p => p.cliente.toLowerCase().includes(filtroTexto) || p.producto.toLowerCase().includes(filtroTexto));
 
         const tot = historial.length; const hCort = historial.slice(0, this.limiteHistorial);
         const tbody = document.getElementById('tabla-historial'); let html = '';
@@ -413,8 +418,19 @@ class PedidosSystem {
             </div>`;
 
             // Botones de Acción
-            footerHtml += `<div class="d-flex flex-wrap justify-content-center gap-2 w-100">`;
-            footerHtml += `<button class="btn btn-success" onclick="PedidosSystem.ejecutarAccionDetalle('entregar', '${ped.id}')"><i class="fas fa-check"></i> Entregar (Historial)</button>`;
+            footerHtml += `<div class="d-flex flex-wrap justify-content-center gap-2 w-100 mt-2">`;
+
+            // NUEVO: Agregado el botón de Ticket en el Kanban
+            footerHtml += `<button class="btn btn-outline-info fw-bold" onclick="PedidosSystem.ejecutarAccionDetalle('reimprimir', '${ped.id}')"><i class="fas fa-receipt"></i> Ticket</button>`;
+
+            footerHtml += `<button class="btn btn-success fw-bold" onclick="PedidosSystem.ejecutarAccionDetalle('entregar', '${ped.id}')"><i class="fas fa-check"></i> Entregar</button>`;
+
+            if (deuda > 0 || !ped.precio) footerHtml += `<button class="btn btn-outline-primary fw-bold" onclick="PedidosSystem.ejecutarAccionDetalle('abonar', '${ped.id}')"><i class="fas fa-coins"></i> Abonar</button>`;
+
+            // NUEVO: Textos en los botones Editar y Anular
+            footerHtml += `<button class="btn btn-outline-secondary" onclick="PedidosSystem.ejecutarAccionDetalle('editar', '${ped.id}')"><i class="fas fa-pen"></i> Editar</button>`;
+            footerHtml += `<button class="btn btn-outline-danger" onclick="PedidosSystem.ejecutarAccionDetalle('cancelar', '${ped.id}')"><i class="fas fa-times"></i> Anular</button>`;
+            footerHtml += `</div>`;
 
             /* --- INICIO WHATSAPP ---
             if (ped.telefono) footerHtml += `<button class="btn text-white shadow-sm" style="background-color: #25D366;" onclick="PedidosSystem.enviarWhatsApp('${ped.id}', 'listo')"><i class="fab fa-whatsapp"></i> Avisar</button>`;
@@ -613,6 +629,15 @@ class DashboardSystem {
     static renderizar() {
         if (!UIManager.vistas.dashboard.classList.contains('active')) return;
         this.renderUtilidadNeta(); this.renderCRM(); this.renderVolatilidad(); this.renderEstacionalidad(); this.renderRetencion(); this.renderGastosAgrupados(); this.renderMetricasAvanzadas();
+
+        // Calcular y mostrar el rango de fechas de los datos
+        let todasLasFechas = [...Estado.pedidos.map(p => p.fecha_solicitud), ...Estado.movimientos.map(m => m.fecha)].filter(f => f);
+        if (todasLasFechas.length > 0) {
+            todasLasFechas.sort();
+            const min = todasLasFechas[0]; const max = todasLasFechas[todasLasFechas.length - 1];
+            const divFechas = document.getElementById('bi-rango-fechas');
+            if (divFechas) divFechas.innerHTML = `<i class="fas fa-calendar-alt"></i> Analizando datos del historial: desde <strong>${min}</strong> hasta <strong>${max}</strong>`;
+        }
     }
     static renderMetricasAvanzadas() {
         const contenedor = document.getElementById('bi-metricas-avanzadas'); if (!contenedor) return;
@@ -665,9 +690,34 @@ class DashboardSystem {
         const data = Object.entries(catMap).sort((a, b) => b[1] - a[1]); if (window.chartEstacion) window.chartEstacion.destroy(); window.chartEstacion = new Chart(document.getElementById('graficoEstacionalidad').getContext('2d'), { type: 'bar', data: { labels: data.map(d => d[0]), datasets: [{ label: 'Trabajos Realizados', data: data.map(d => d[1]), backgroundColor: '#0d6efd' }] }, options: { responsive: true, maintainAspectRatio: false } });
     }
     static renderGastosAgrupados() {
-        let gastos = { 'Telas y Costura': 0, 'Suministros (Sublimación)': 0, 'Transporte': 0, 'Gastos Generales': 0 };
-        Estado.movimientos.filter(m => m.tipo === 'salida').forEach(m => { let desc = (m.descripcion || '').toLowerCase(); let entidad = (m.entidad || '').toLowerCase(); let txt = desc + " " + entidad; if (txt.includes('tela') || txt.includes('aracely') || txt.includes('brush') || txt.includes('hilo')) { gastos['Telas y Costura'] += m.monto; } else if (txt.includes('ubora') || txt.includes('suministro') || txt.includes('sublimación') || txt.includes('tinta') || txt.includes('papel') || txt.includes('vinil')) { gastos['Suministros (Sublimación)'] += m.monto; } else if (txt.includes('pasaje') || txt.includes('bus') || txt.includes('uber') || txt.includes('transporte') || txt.includes('gasolina')) { gastos['Transporte'] += m.monto; } else { gastos['Gastos Generales'] += m.monto; } });
-        if (window.chartGastos) window.chartGastos.destroy(); window.chartGastos = new Chart(document.getElementById('graficoGastos').getContext('2d'), { type: 'doughnut', data: { labels: Object.keys(gastos), datasets: [{ data: Object.values(gastos), backgroundColor: ['#e83e8c', '#0dcaf0', '#fd7e14', '#6c757d'] }] }, options: { responsive: true, maintainAspectRatio: false } });
+        let gastos = { 'Telas y Costura': 0, 'Suministros (Sublimación)': 0, 'Transporte': 0, 'Servicios Públicos': 0, 'Alimentación': 0, 'Gastos Generales': 0 };
+
+        Estado.movimientos.filter(m => m.tipo === 'salida').forEach(m => {
+            let desc = (m.descripcion || '').toLowerCase(); let entidad = (m.entidad || '').toLowerCase(); let txt = desc + " " + entidad;
+
+            if (txt.includes('tela') || txt.includes('aracely') || txt.includes('brush') || txt.includes('hilo')) {
+                gastos['Telas y Costura'] += m.monto;
+            } else if (txt.includes('ubora') || txt.includes('suministro') || txt.includes('sublimación') || txt.includes('sublimacion') || txt.includes('tinta') || txt.includes('papel') || txt.includes('vinil')) {
+                gastos['Suministros (Sublimación)'] += m.monto;
+            } else if (txt.includes('pasaje') || txt.includes('bus') || txt.includes('uber') || txt.includes('transporte') || txt.includes('gasolina') || txt.includes('bomba') || txt.includes('transtusa')) {
+                gastos['Transporte'] += m.monto;
+            } else if (txt.includes('ice') || txt.includes('luz') || txt.includes('agua') || txt.includes('municipalidad') || txt.includes('internet')) {
+                gastos['Servicios Públicos'] += m.monto;
+            } else if (txt.includes('comida') || txt.includes('macdonald') || txt.includes('almuerzo')) {
+                gastos['Alimentación'] += m.monto;
+            } else {
+                gastos['Gastos Generales'] += m.monto;
+            }
+        });
+
+        // Limpiar los rubros que estén en 0
+        Object.keys(gastos).forEach(key => { if (gastos[key] === 0) delete gastos[key]; });
+
+        const etiquetas = Object.keys(gastos); const valores = Object.values(gastos);
+        const colores = ['#e83e8c', '#0dcaf0', '#fd7e14', '#0d6efd', '#20c997', '#6c757d'];
+
+        if (window.chartGastos) window.chartGastos.destroy();
+        window.chartGastos = new Chart(document.getElementById('graficoGastos').getContext('2d'), { type: 'doughnut', data: { labels: etiquetas, datasets: [{ data: valores, backgroundColor: colores.slice(0, etiquetas.length) }] }, options: { responsive: true, maintainAspectRatio: false } });
     }
 }
 
@@ -697,6 +747,34 @@ class App {
 
         document.getElementById('filtro-historial').addEventListener('change', () => PedidosSystem.renderizarHistorial());
         ['filtro-modo', 'filtro-inicio', 'filtro-fin'].forEach(id => document.getElementById(id).addEventListener('input', () => FinanzasSystem.renderizarReporte()));
+
+        // NUEVO: Escuchar la barra de búsqueda del Historial
+        const fTextHist = document.getElementById('filtro-historial-texto');
+        if (fTextHist) fTextHist.addEventListener('input', () => PedidosSystem.renderizarHistorial());
+
+        // NUEVO: SISTEMA DE CONTACTOS PARA VENTA RÁPIDA
+        const btnContactosVR = document.getElementById('btn-contactos-vr');
+        if (btnContactosVR) {
+            if ('contacts' in navigator && 'ContactsManager' in window) {
+                btnContactosVR.addEventListener('click', async () => {
+                    try {
+                        const contactosAgarrados = await navigator.contacts.select(['name', 'tel'], { multiple: false });
+                        if (contactosAgarrados.length > 0) {
+                            const contacto = contactosAgarrados[0];
+                            if (contacto.tel && contacto.tel.length > 0) {
+                                let num = contacto.tel[0].replace(/[\s-]/g, '');
+                                if (num.startsWith('+506')) num = num.substring(4);
+                                document.getElementById('vr-telefono').value = num;
+                            }
+                            if (contacto.name && contacto.name.length > 0) {
+                                const inputNombre = document.getElementById('vr-cliente');
+                                if (!inputNombre.value) inputNombre.value = contacto.name[0];
+                            }
+                        }
+                    } catch (ex) { console.log("Selección de contacto VR cancelada."); }
+                });
+            } else { btnContactosVR.style.display = 'none'; }
+        }
 
         // --- SISTEMA DE CONTACTOS ---
         const btnContactos = document.getElementById('btn-contactos');

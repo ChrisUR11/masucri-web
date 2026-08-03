@@ -199,8 +199,6 @@
                         <div class="flex-grow-1"><label class="form-label small text-muted mb-1">Buscar</label><input
                                 type="text" id="filtro-pedido-texto" class="form-control form-control-sm border-primary"
                                 placeholder="Cliente o producto..."></div>
-                        <div><label class="form-label small text-muted mb-1">Desde (Solicitud)</label><input type="date"
-                                id="filtro-pedido-solicitud" class="form-control form-control-sm"></div>
                         <div><button id="btn-limpiar-pedidos" class="btn btn-sm btn-outline-secondary w-100">Limpiar
                                 Filtros</button></div>
                     </div>
@@ -300,15 +298,21 @@
 
             <!-- VISTA 2: HISTORIAL DE ENTREGAS -->
             <div id="vista-historial" class="view-section">
-                <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+                <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
                     <h3 class="fw-bold m-0">Historial de Trabajos</h3>
-                    <select id="filtro-historial"
-                        class="form-select w-auto border-primary fw-bold text-primary shadow-sm">
-                        <option value="con_saldo" selected>Mostrar: Con Saldo Pendiente</option>
-                        <option value="todos">Mostrar: Todos</option>
-                        <option value="entregados">Mostrar: Cancelados al 100%</option>
-                        <option value="anulados">Mostrar: Anulados/Eliminados</option>
-                    </select>
+                    <div class="d-flex gap-2 flex-wrap flex-grow-1 justify-content-end">
+                        <!-- NUEVO: BUSCADOR DE HISTORIAL -->
+                        <input type="text" id="filtro-historial-texto"
+                            class="form-control form-control-sm border-primary shadow-sm"
+                            placeholder="Buscar cliente o producto..." style="max-width: 250px;">
+                        <select id="filtro-historial"
+                            class="form-select form-select-sm w-auto border-primary fw-bold text-primary shadow-sm">
+                            <option value="con_saldo" selected>Mostrar: Con Saldo Pendiente</option>
+                            <option value="todos">Mostrar: Todos</option>
+                            <option value="entregados">Mostrar: Cancelados al 100%</option>
+                            <option value="anulados">Mostrar: Anulados/Eliminados</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="card shadow-sm border-0">
                     <div class="card-body table-responsive p-0" style="max-height: 600px; overflow-y: auto;">
@@ -463,7 +467,9 @@
 
             <!-- VISTA 5: DASHBOARD BI -->
             <div id="vista-dashboard" class="view-section">
-                <h2 class="mb-4">Inteligencia de Negocios (BI)</h2>
+                <h2 class="mb-1">Inteligencia de Negocios (BI)</h2>
+                <!-- NUEVO: RANGO DE FECHAS -->
+                <p id="bi-rango-fechas" class="text-muted small mb-4">Calculando rango de fechas...</p>
 
                 <!-- 1. UTILIDAD NETA (NUEVO) -->
                 <div class="row mb-4">
@@ -789,7 +795,14 @@
                                 </div>
                                 <div class="col-6">
                                     <label class="form-label small text-muted">Teléfono (Opcional)</label>
-                                    <input type="text" id="vr-telefono" class="form-control" placeholder="Ej: 88888888">
+                                    <div class="input-group">
+                                        <input type="text" id="vr-telefono" class="form-control border-secondary"
+                                            placeholder="Ej: 88888888">
+                                        <button type="button" class="btn btn-outline-secondary px-2"
+                                            id="btn-contactos-vr" title="Elegir desde agenda">
+                                            <i class="fas fa-address-book"></i>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                             <div class="mb-3">
