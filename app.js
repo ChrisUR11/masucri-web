@@ -157,9 +157,9 @@ class VentaRapidaSystem {
     }
 }
 
-// ==========================================
-// CLASE 3: SISTEMA DE PEDIDOS (KANBAN Y LEALTAD)
-// ==========================================
+// ========================================== 
+// CLASE 3: SISTEMA DE PEDIDOS (KANBAN Y LEALTAD) 
+// ========================================== 
 class PedidosSystem {
     static limiteHistorial = 50;
     static primeraCargaNotificaciones = true;
@@ -172,41 +172,46 @@ class PedidosSystem {
             this.actualizarCatalogo();
             this.renderizarPendientes();
             this.renderizarHistorial();
-            // Si el historial falla, el código de abajo nunca se ejecuta. Ya está arreglado abajo.
             if (UIManager.vistas.dashboard.classList.contains('active')) DashboardSystem.renderizar();
-            if (this.primeraCargaNotificaciones) {
-                this.analizarNotificaciones();
-                this.primeraCargaNotificaciones = false;
+
+            // --- NOTIFICACIONES DESACTIVADAS ---
+            /*
+            if (this.primeraCargaNotificaciones) { 
+                this.analizarNotificaciones(); 
+                this.primeraCargaNotificaciones = false; 
             }
+            */
         });
     }
 
-    // --- ALERTAS DE INICIO ---
-    static analizarNotificaciones() {
-        const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
-        let atrasados = 0; let paraHoy = 0;
-        Estado.pedidos.filter(p => p.estado === 'Pendiente').forEach(ped => {
-            if (ped.fecha_entrega) {
-                const diff = Math.ceil((new Date(ped.fecha_entrega + 'T00:00:00') - hoy) / 86400000);
-                if (diff < 0) atrasados++;
-                else if (diff === 0) paraHoy++;
-            }
-        });
-        if (atrasados > 0 || paraHoy > 0) {
-            const mensaje = `¡Hola! Tienes ${atrasados} pedido(s) atrasados y ${paraHoy} para entregar hoy.`;
-            document.getElementById('toast-body-texto').textContent = mensaje;
-            new bootstrap.Toast(document.getElementById('toast-notificacion'), { delay: 6000 }).show();
-            if ("Notification" in window) {
-                if (Notification.permission === "granted") {
-                    navigator.serviceWorker.ready.then(reg => reg.showNotification("Trabajos Pendientes ⚠️", { body: mensaje, icon: "logo-masucri.png" }));
-                } else if (Notification.permission !== "denied") {
-                    Notification.requestPermission().then(permission => {
-                        if (permission === "granted") navigator.serviceWorker.ready.then(reg => reg.showNotification("Trabajos Pendientes ⚠️", { body: mensaje, icon: "logo-masucri.png" }));
-                    });
-                }
-            }
-        }
-    }
+    // --- ALERTAS DE INICIO (DESACTIVADAS) --- 
+    /*
+    static analizarNotificaciones() { 
+        const hoy = new Date(); hoy.setHours(0, 0, 0, 0); 
+        let atrasados = 0; let paraHoy = 0; 
+        Estado.pedidos.filter(p => p.estado === 'Pendiente').forEach(ped => { 
+            if (ped.fecha_entrega) { 
+                const diff = Math.ceil((new Date(ped.fecha_entrega + 'T00:00:00') - hoy) / 86400000); 
+                if (diff < 0) atrasados++; 
+                else if (diff === 0) paraHoy++; 
+            } 
+        }); 
+        if (atrasados > 0 || paraHoy > 0) { 
+            const mensaje = `¡Hola! Tienes ${atrasados} pedido(s) atrasados y ${paraHoy} para entregar hoy.`; 
+            document.getElementById('toast-body-texto').textContent = mensaje; 
+            new bootstrap.Toast(document.getElementById('toast-notificacion'), { delay: 6000 }).show(); 
+            if ("Notification" in window) { 
+                if (Notification.permission === "granted") { 
+                    navigator.serviceWorker.ready.then(reg => reg.showNotification("Trabajos Pendientes ⚠️", { body: mensaje, icon: "logo-masucri.png" })); 
+                } else if (Notification.permission !== "denied") { 
+                    Notification.requestPermission().then(permission => { 
+                        if (permission === "granted") navigator.serviceWorker.ready.then(reg => reg.showNotification("Trabajos Pendientes ⚠️", { body: mensaje, icon: "logo-masucri.png" })); 
+                    }); 
+                } 
+            } 
+        } 
+    } 
+    */
 
     // --- LEALTAD Y WHATSAPP ---
     static verificarLealtad() {
