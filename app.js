@@ -82,36 +82,56 @@ class TicketSystem {
 class UIManager {
     static init() {
         this.vistas = {
-            pedidos: document.getElementById('vista-pedidos'), historial: document.getElementById('vista-historial'),
-            registro: document.getElementById('vista-registro'), reportes: document.getElementById('vista-reportes'),
-            dashboard: document.getElementById('vista-dashboard'), catalogo: document.getElementById('vista-catalogo')
+            pedidos: document.getElementById('vista-pedidos'),
+            historial: document.getElementById('vista-historial'),
+            registro: document.getElementById('vista-registro'),
+            reportes: document.getElementById('vista-reportes'),
+            dashboard: document.getElementById('vista-dashboard'),
+            catalogo: document.getElementById('vista-catalogo')
         };
         this.navLinks = {
-            pedidos: document.getElementById('nav-pedidos'), historial: document.getElementById('nav-historial'),
-            registro: document.getElementById('nav-registro'), reportes: document.getElementById('nav-reportes'),
-            dashboard: document.getElementById('nav-dashboard'), catalogo: document.getElementById('nav-catalogo')
+            pedidos: document.getElementById('nav-pedidos'),
+            historial: document.getElementById('nav-historial'),
+            registro: document.getElementById('nav-registro'),
+            reportes: document.getElementById('nav-reportes'),
+            dashboard: document.getElementById('nav-dashboard'),
+            catalogo: document.getElementById('nav-catalogo')
         };
+
+        // Agregar el evento click solo a los botones que sí existen en el HTML
         Object.keys(this.navLinks).forEach(key => {
             if (this.navLinks[key]) {
-                this.navLinks[key].addEventListener('click', (e) => { e.preventDefault(); this.cambiarVista(key); });
+                this.navLinks[key].addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.cambiarVista(key);
+                });
             }
         });
     }
+
     static cambiarVista(vistaActiva) {
+        // 1. Ocultar todo
         Object.values(this.vistas).forEach(v => { if (v) v.classList.remove('active'); });
         Object.values(this.navLinks).forEach(n => { if (n) n.classList.remove('active'); });
 
+        // 2. Mostrar solo la vista seleccionada
         if (this.vistas[vistaActiva]) this.vistas[vistaActiva].classList.add('active');
         if (this.navLinks[vistaActiva]) this.navLinks[vistaActiva].classList.add('active');
 
+        // 3. Ejecutar las funciones necesarias al abrir la pestaña
         if (vistaActiva === 'reportes') FinanzasSystem.renderizarReporte();
         if (vistaActiva === 'pedidos') PedidosSystem.renderizarPendientes();
         if (vistaActiva === 'historial') PedidosSystem.renderizarHistorial();
         if (vistaActiva === 'dashboard') DashboardSystem.renderizar();
-        if (vistaActiva === 'catalogo') CatalogoSystem.renderizar();
+        // ESTA ERA LA LÍNEA QUE FALLABA. Ahora nos aseguramos de que CatalogoSystem exista antes de llamarlo.
+        if (vistaActiva === 'catalogo' && typeof CatalogoSystem !== 'undefined') CatalogoSystem.renderizar();
 
+        // 4. Cerrar el menú hamburguesa en celulares
         const navbarCollapse = document.getElementById('navbarNav');
-        if (navbarCollapse.classList.contains('show')) document.querySelector('.navbar-toggler').click();
+        if (navbarCollapse && navbarCollapse.classList.contains('show')) {
+            const toggler = document.querySelector('.navbar-toggler');
+            if (toggler) toggler.click();
+        }
     }
 }
 
@@ -120,19 +140,30 @@ class UIManager {
 // ==========================================
 class CatalogoSystem {
     static init() {
-        onSnapshot(query(collection(db, "productos"), orderBy("nombre", "asc")), (snapshot) => {
-            Estado.productos = [];
-            snapshot.forEach(doc => Estado.productos.push({ id: doc.id, ...doc.data() }));
-            this.renderizar();
-            PedidosSystem.actualizarCatalogo(); // Actualiza las barras de autocompletado
-        });
+        // Envolvemos esto en un try-catch por si la base de datos de Firebase no tiene la tabla 'productos' aún.
+        try {
+            onSnapshot(query(collection(db, "productos"), orderBy("nombre", "asc")), (snapshot) => {
+                Estado.productos = [];
+                snapshot.forEach(doc => Estado.productos.push({ id: doc.id, ...doc.data() }));
+                this.renderizar();
+                PedidosSystem.actualizarCatalogo(); // Actualiza las barras de autocompletado
+            }, (error) => {
+                console.error("Error cargando productos:", error);
+                // Si Firebase pide crear un índice, lo mostrará en la consola (F12).
+            });
+        } catch (e) {
+            console.error("Fallo al iniciar el catálogo:", e);
+        }
     }
 
     static renderizar() {
+        // Si la vista de catálogo no existe en el HTML o no está activa, no hagas nada.
         if (!UIManager.vistas.catalogo || !UIManager.vistas.catalogo.classList.contains('active')) return;
 
-        const filtro = document.getElementById('filtro-catalogo-texto').value.toLowerCase();
-        let filtrados = Estado.productos;
+        const fTexto = document.getElementById('filtro-catalogo-texto');
+        const filtro = fTexto ? fTexto.value.toLowerCase() : '';
+        let filtrados = Estado.productos || [];
+
         if (filtro) {
             filtrados = filtrados.filter(p =>
                 (p.nombre && p.nombre.toLowerCase().includes(filtro)) ||
@@ -141,6 +172,8 @@ class CatalogoSystem {
         }
 
         const tbody = document.getElementById('tabla-catalogo');
+        if (!tbody) return; // Prevención de errores si el HTML no está listo
+
         let html = '';
         filtrados.forEach(p => {
             html += `<tr>
@@ -151,12 +184,12 @@ class CatalogoSystem {
                     <span class="text-success fw-bold d-block">V: ₡${(p.precio_venta || 0).toLocaleString('es-CR')}</span>
                 </td>
                 <td class="text-center">
-                    <button class="btn btn-sm btn-outline-secondary" onclick="CatalogoSystem.abrirModal('${p.id}')"><i class="fas fa-pen"></i></button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="CatalogoSystem.borrar('${p.id}')"><i class="fas fa-trash"></i></button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="window.CatalogoSystem.abrirModal('${p.id}')"><i class="fas fa-pen"></i></button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="window.CatalogoSystem.borrar('${p.id}')"><i class="fas fa-trash"></i></button>
                 </td>
             </tr>`;
         });
-        tbody.innerHTML = html || '<tr><td colspan="4" class="text-center py-4">No hay productos registrados.</td></tr>';
+        tbody.innerHTML = html || '<tr><td colspan="4" class="text-center py-4">No hay productos registrados en el inventario.</td></tr>';
     }
 
     static abrirModal(id = null) {
