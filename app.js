@@ -64,7 +64,7 @@ class TicketSystem {
             canvas.toBlob(async (blob) => {
                 const file = new File([blob], `Ticket_${cliente.replace(/\s+/g, '_')}.png`, { type: 'image/png' });
                 if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                    try { await navigator.share({ files: [file], title: 'Comprobante MASUCRI' }); } 
+                    try { await navigator.share({ files: [file], title: 'Comprobante MASUCRI' }); }
                     catch (err) { console.log("Compartir cancelado"); }
                 } else {
                     const link = document.createElement('a'); link.download = file.name; link.href = URL.createObjectURL(blob); link.click();
@@ -81,35 +81,35 @@ class TicketSystem {
 // ==========================================
 class UIManager {
     static init() {
-        this.vistas = { 
-            pedidos: document.getElementById('vista-pedidos'), historial: document.getElementById('vista-historial'), 
-            registro: document.getElementById('vista-registro'), reportes: document.getElementById('vista-reportes'), 
-            dashboard: document.getElementById('vista-dashboard'), catalogo: document.getElementById('vista-catalogo') 
+        this.vistas = {
+            pedidos: document.getElementById('vista-pedidos'), historial: document.getElementById('vista-historial'),
+            registro: document.getElementById('vista-registro'), reportes: document.getElementById('vista-reportes'),
+            dashboard: document.getElementById('vista-dashboard'), catalogo: document.getElementById('vista-catalogo')
         };
-        this.navLinks = { 
-            pedidos: document.getElementById('nav-pedidos'), historial: document.getElementById('nav-historial'), 
-            registro: document.getElementById('nav-registro'), reportes: document.getElementById('nav-reportes'), 
-            dashboard: document.getElementById('nav-dashboard'), catalogo: document.getElementById('nav-catalogo') 
+        this.navLinks = {
+            pedidos: document.getElementById('nav-pedidos'), historial: document.getElementById('nav-historial'),
+            registro: document.getElementById('nav-registro'), reportes: document.getElementById('nav-reportes'),
+            dashboard: document.getElementById('nav-dashboard'), catalogo: document.getElementById('nav-catalogo')
         };
-        Object.keys(this.navLinks).forEach(key => { 
-            if(this.navLinks[key]) {
-                this.navLinks[key].addEventListener('click', (e) => { e.preventDefault(); this.cambiarVista(key); }); 
+        Object.keys(this.navLinks).forEach(key => {
+            if (this.navLinks[key]) {
+                this.navLinks[key].addEventListener('click', (e) => { e.preventDefault(); this.cambiarVista(key); });
             }
         });
     }
     static cambiarVista(vistaActiva) {
-        Object.values(this.vistas).forEach(v => { if(v) v.classList.remove('active'); }); 
-        Object.values(this.navLinks).forEach(n => { if(n) n.classList.remove('active'); });
-        
-        if(this.vistas[vistaActiva]) this.vistas[vistaActiva].classList.add('active'); 
-        if(this.navLinks[vistaActiva]) this.navLinks[vistaActiva].classList.add('active');
-        
+        Object.values(this.vistas).forEach(v => { if (v) v.classList.remove('active'); });
+        Object.values(this.navLinks).forEach(n => { if (n) n.classList.remove('active'); });
+
+        if (this.vistas[vistaActiva]) this.vistas[vistaActiva].classList.add('active');
+        if (this.navLinks[vistaActiva]) this.navLinks[vistaActiva].classList.add('active');
+
         if (vistaActiva === 'reportes') FinanzasSystem.renderizarReporte();
         if (vistaActiva === 'pedidos') PedidosSystem.renderizarPendientes();
         if (vistaActiva === 'historial') PedidosSystem.renderizarHistorial();
         if (vistaActiva === 'dashboard') DashboardSystem.renderizar();
         if (vistaActiva === 'catalogo') CatalogoSystem.renderizar();
-        
+
         const navbarCollapse = document.getElementById('navbarNav');
         if (navbarCollapse.classList.contains('show')) document.querySelector('.navbar-toggler').click();
     }
@@ -130,16 +130,16 @@ class CatalogoSystem {
 
     static renderizar() {
         if (!UIManager.vistas.catalogo || !UIManager.vistas.catalogo.classList.contains('active')) return;
-        
+
         const filtro = document.getElementById('filtro-catalogo-texto').value.toLowerCase();
         let filtrados = Estado.productos;
         if (filtro) {
-            filtrados = filtrados.filter(p => 
-                (p.nombre && p.nombre.toLowerCase().includes(filtro)) || 
+            filtrados = filtrados.filter(p =>
+                (p.nombre && p.nombre.toLowerCase().includes(filtro)) ||
                 (p.proveedor && p.proveedor.toLowerCase().includes(filtro))
             );
         }
-        
+
         const tbody = document.getElementById('tabla-catalogo');
         let html = '';
         filtrados.forEach(p => {
@@ -163,7 +163,7 @@ class CatalogoSystem {
         document.getElementById('form-producto').reset();
         document.getElementById('prod-id').value = '';
         document.getElementById('tituloModalProducto').innerHTML = '<i class="fas fa-tag"></i> Nuevo Producto';
-        
+
         if (id) {
             const p = Estado.productos.find(x => x.id === id);
             if (p) {
@@ -190,13 +190,13 @@ class CatalogoSystem {
             costo: parseFloat(document.getElementById('prod-costo').value) || 0,
             precio_venta: parseFloat(document.getElementById('prod-venta').value) || 0
         };
-        
+
         try {
             if (id) await updateDoc(doc(db, "productos", id), datos);
             else await addDoc(collection(db, "productos"), datos);
             if (Estado.modales.catalogo) Estado.modales.catalogo.hide();
             Swal.fire({ icon: 'success', title: 'Producto Guardado', timer: 1000, showConfirmButton: false });
-        } catch (err) { Swal.fire('Error', 'No se guardó el producto.', 'error'); } 
+        } catch (err) { Swal.fire('Error', 'No se guardó el producto.', 'error'); }
         finally { btn.disabled = false; }
     }
 
@@ -248,7 +248,7 @@ class VentaRapidaSystem {
             if ((await Swal.fire({ title: '¡Venta Registrada!', text: '¿Deseas enviar el comprobante?', icon: 'success', showCancelButton: true })).isConfirmed) {
                 TicketSystem.generar(docRef.id.slice(-5).toUpperCase(), cliente, producto, precioTotal, precioTotal, montoPagado, deuda, deuda <= 0 ? 'CANCELADO' : 'SALDO PENDIENTE', metodo);
             }
-        } catch (error) { Swal.fire('Error', 'Fallo al guardar', 'error'); } 
+        } catch (error) { Swal.fire('Error', 'Fallo al guardar', 'error'); }
         finally { btn.disabled = false; }
     }
 }
@@ -343,7 +343,7 @@ class PedidosSystem {
         if (fTexto) activos = activos.filter(p => (p.cliente && p.cliente.toLowerCase().includes(fTexto)) || (p.producto && p.producto.toLowerCase().includes(fTexto)));
         activos.sort((a, b) => new Date(a.fecha_entrega || '2099-01-01') - new Date(b.fecha_entrega || '2099-01-01'));
         const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
-        
+
         activos.forEach(ped => {
             let colorAlerta = 'border-secondary';
             if (ped.fecha_entrega) {
@@ -392,8 +392,8 @@ class PedidosSystem {
         else if (filtro === 'anulados') historial = historial.filter(p => p.estado === 'Cancelado');
 
         if (filtroTexto) {
-            historial = historial.filter(p => 
-                (p.cliente && p.cliente.toLowerCase().includes(filtroTexto)) || 
+            historial = historial.filter(p =>
+                (p.cliente && p.cliente.toLowerCase().includes(filtroTexto)) ||
                 (p.producto && p.producto.toLowerCase().includes(filtroTexto))
             );
         }
@@ -659,7 +659,7 @@ class DashboardSystem {
     static renderizar() {
         if (!UIManager.vistas.dashboard.classList.contains('active')) return;
         this.renderUtilidadNeta(); this.renderCRM(); this.renderVolatilidad(); this.renderEstacionalidad(); this.renderRetencion(); this.renderGastosAgrupados(); this.renderMetricasAvanzadas();
-        
+
         let todasLasFechas = [...Estado.pedidos.map(p => p.fecha_solicitud), ...Estado.movimientos.map(m => m.fecha)].filter(f => f);
         const divFechas = document.getElementById('bi-rango-fechas');
         if (divFechas) {
@@ -741,28 +741,38 @@ class App {
     static init() {
         UIManager.init();
         if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').then(reg => console.log('PWA lista')).catch(err => console.log('PWA falló', err)); }); }
-        
+
         const inputTel = document.getElementById('ped-telefono'); const inputNom = document.getElementById('ped-cliente');
         if (inputTel) inputTel.addEventListener('change', () => PedidosSystem.verificarLealtad()); if (inputNom) inputNom.addEventListener('change', () => PedidosSystem.verificarLealtad());
-        
+
+        // --- CONEXIÓN DE FORMULARIOS ---
         document.getElementById('form-pedido').addEventListener('submit', PedidosSystem.guardar);
         document.getElementById('form-venta-rapida').addEventListener('submit', VentaRapidaSystem.guardar);
         document.getElementById('form-movimiento').addEventListener('submit', FinanzasSystem.registrarManual);
         document.getElementById('form-editar-mov').addEventListener('submit', FinanzasSystem.guardarEdicion);
+
+        // ¡ESTO ES LO QUE FALTABA PARA EL CATÁLOGO!
+        const formCatalogo = document.getElementById('form-producto');
+        if (formCatalogo) formCatalogo.addEventListener('submit', CatalogoSystem.guardar);
+
         document.getElementById('btn-export-pdf').addEventListener('click', () => this.exportar('pdf')); document.getElementById('btn-export-excel').addEventListener('click', () => this.exportar('excel'));
-        
+
         const fText = document.getElementById('filtro-pedido-texto'); const fSol = document.getElementById('filtro-pedido-solicitud');
         if (fText) fText.addEventListener('input', () => PedidosSystem.renderizarPendientes());
         if (fSol) fSol.addEventListener('input', () => PedidosSystem.renderizarPendientes());
-        
+
         const btnL = document.getElementById('btn-limpiar-pedidos');
         if (btnL) btnL.addEventListener('click', () => { if (fText) fText.value = ''; if (fSol) fSol.value = ''; PedidosSystem.renderizarPendientes(); });
-        
+
         document.getElementById('filtro-historial').addEventListener('change', () => PedidosSystem.renderizarHistorial());
         ['filtro-modo', 'filtro-inicio', 'filtro-fin'].forEach(id => document.getElementById(id).addEventListener('input', () => FinanzasSystem.renderizarReporte()));
-        
+
         const fTextHist = document.getElementById('filtro-historial-texto');
         if (fTextHist) fTextHist.addEventListener('input', () => PedidosSystem.renderizarHistorial());
+
+        // --- BUSCADOR DEL CATÁLOGO ---
+        const fTextCat = document.getElementById('filtro-catalogo-texto');
+        if (fTextCat) fTextCat.addEventListener('input', () => { if (typeof CatalogoSystem !== 'undefined') CatalogoSystem.renderizar(); });
 
         // --- SISTEMA DE CONTACTOS PARA VENTA RÁPIDA (REPARADO Y BLINDADO) ---
         const btnContactosVR = document.getElementById('btn-contactos-vr');
@@ -785,7 +795,7 @@ class App {
                         }
                     } catch (ex) { console.log("Selección de contacto VR cancelada."); }
                 });
-            } else { 
+            } else {
                 btnContactosVR.classList.add('d-none');
                 if (btnContactosVR.parentElement) btnContactosVR.parentElement.classList.remove('input-group');
             }
@@ -813,7 +823,7 @@ class App {
                         }
                     } catch (ex) { console.log("Selección de contacto cancelada."); }
                 });
-            } else { 
+            } else {
                 btnContactos.classList.add('d-none');
                 if (btnContactos.parentElement) btnContactos.parentElement.classList.remove('input-group');
             }
@@ -825,6 +835,7 @@ class App {
             const precio = document.getElementById(precioId);
             if (input && precio) {
                 input.addEventListener('change', () => {
+                    if (!Estado.productos) return;
                     const prod = Estado.productos.find(p => p.nombre.toLowerCase() === input.value.trim().toLowerCase());
                     if (prod && prod.precio_venta > 0 && !precio.value) {
                         precio.value = prod.precio_venta;
@@ -853,7 +864,7 @@ class App {
         const btnScrollTop = document.getElementById('btn-scroll-top');
         if (btnScrollTop) {
             window.addEventListener('scroll', () => {
-                if (window.scrollY > 300) { btnScrollTop.classList.remove('d-none'); btnScrollTop.classList.add('d-flex'); } 
+                if (window.scrollY > 300) { btnScrollTop.classList.remove('d-none'); btnScrollTop.classList.add('d-flex'); }
                 else { btnScrollTop.classList.remove('d-flex'); btnScrollTop.classList.add('d-none'); }
             });
             btnScrollTop.addEventListener('click', () => { window.scrollTo({ top: 0, behavior: 'smooth' }); });
@@ -863,15 +874,18 @@ class App {
             if (user && CORREOS_PERMITIDOS.includes(user.email)) {
                 document.getElementById('login-container').classList.add('d-none'); document.getElementById('app-container').classList.remove('d-none'); document.getElementById('app-container').classList.add('d-flex');
                 document.getElementById('user-info').textContent = `Admin: ${user.displayName}`;
+
                 const mP = document.getElementById('modalPedido'); if (mP) Estado.modales.pedido = new bootstrap.Modal(mP);
                 const mM = document.getElementById('modalEditarMov'); if (mM) Estado.modales.editarMov = new bootstrap.Modal(mM);
                 const mDP = document.getElementById('modalDetallePedido'); if (mDP) Estado.modales.detallePedido = new bootstrap.Modal(mDP);
                 const mVR = document.getElementById('modalVentaRapida'); if (mVR) Estado.modales.ventaRapida = new bootstrap.Modal(mVR);
                 const mCat = document.getElementById('modalProducto'); if (mCat) Estado.modales.catalogo = new bootstrap.Modal(mCat);
-                PedidosSystem.init(); FinanzasSystem.init(); 
-                if(typeof CatalogoSystem !== 'undefined') CatalogoSystem.init();
+
+                PedidosSystem.init(); FinanzasSystem.init();
+                if (typeof CatalogoSystem !== 'undefined') CatalogoSystem.init();
+
                 UIManager.cambiarVista('pedidos');
-            } else if (user) { await signOut(auth); Swal.fire({ icon: 'error', title: 'Acceso Denegado' }); } 
+            } else if (user) { await signOut(auth); Swal.fire({ icon: 'error', title: 'Acceso Denegado' }); }
             else { document.getElementById('login-container').classList.remove('d-none'); document.getElementById('app-container').classList.add('d-none'); document.getElementById('app-container').classList.remove('d-flex'); }
         });
     }
@@ -895,5 +909,5 @@ App.init();
 window.PedidosSystem = PedidosSystem;
 window.FinanzasSystem = FinanzasSystem;
 window.VentaRapidaSystem = VentaRapidaSystem;
-if(typeof CatalogoSystem !== 'undefined') window.CatalogoSystem = CatalogoSystem;
-window.cargarMasHistorial = () => { PedidosSystem.limiteHistorial += 50; PedidosSystem.renderizarHistorial(); };F
+if (typeof CatalogoSystem !== 'undefined') window.CatalogoSystem = CatalogoSystem;
+window.cargarMasHistorial = () => { PedidosSystem.limiteHistorial += 50; PedidosSystem.renderizarHistorial(); };

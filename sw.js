@@ -1,4 +1,4 @@
-const CACHE_NAME = 'masucri-cache-v9';
+const CACHE_NAME = 'masucri-cache-v9.1';
 const urlsToCache = [
     './',
     './index.html',
