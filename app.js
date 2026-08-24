@@ -29,8 +29,8 @@ enableIndexedDbPersistence(db).catch((err) => {
 const CORREOS_PERMITIDOS = ["ulloarodriguezchris@gmail.com", "anisrmj5@gmail.com"];
 
 const Estado = {
-    movimientos: [], pedidos: [], datosParaExportar: [],
-    modales: { pedido: null, editarMov: null, detallePedido: null, ventaRapida: null }
+    movimientos: [], pedidos: [], productos: [], datosParaExportar: [],
+    modales: { pedido: null, editarMov: null, detallePedido: null, ventaRapida: null, catalogo: null }
 };
 
 // ==========================================
@@ -64,7 +64,7 @@ class TicketSystem {
             canvas.toBlob(async (blob) => {
                 const file = new File([blob], `Ticket_${cliente.replace(/\s+/g, '_')}.png`, { type: 'image/png' });
                 if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                    try { await navigator.share({ files: [file], title: 'Comprobante MASUCRI' }); }
+                    try { await navigator.share({ files: [file], title: 'Comprobante MASUCRI' }); } 
                     catch (err) { console.log("Compartir cancelado"); }
                 } else {
                     const link = document.createElement('a'); link.download = file.name; link.href = URL.createObjectURL(blob); link.click();
@@ -81,24 +81,134 @@ class TicketSystem {
 // ==========================================
 class UIManager {
     static init() {
-        this.vistas = { pedidos: document.getElementById('vista-pedidos'), historial: document.getElementById('vista-historial'), registro: document.getElementById('vista-registro'), reportes: document.getElementById('vista-reportes'), dashboard: document.getElementById('vista-dashboard') };
-        this.navLinks = { pedidos: document.getElementById('nav-pedidos'), historial: document.getElementById('nav-historial'), registro: document.getElementById('nav-registro'), reportes: document.getElementById('nav-reportes'), dashboard: document.getElementById('nav-dashboard') };
-        Object.keys(this.navLinks).forEach(key => { this.navLinks[key].addEventListener('click', (e) => { e.preventDefault(); this.cambiarVista(key); }); });
+        this.vistas = { 
+            pedidos: document.getElementById('vista-pedidos'), historial: document.getElementById('vista-historial'), 
+            registro: document.getElementById('vista-registro'), reportes: document.getElementById('vista-reportes'), 
+            dashboard: document.getElementById('vista-dashboard'), catalogo: document.getElementById('vista-catalogo') 
+        };
+        this.navLinks = { 
+            pedidos: document.getElementById('nav-pedidos'), historial: document.getElementById('nav-historial'), 
+            registro: document.getElementById('nav-registro'), reportes: document.getElementById('nav-reportes'), 
+            dashboard: document.getElementById('nav-dashboard'), catalogo: document.getElementById('nav-catalogo') 
+        };
+        Object.keys(this.navLinks).forEach(key => { 
+            if(this.navLinks[key]) {
+                this.navLinks[key].addEventListener('click', (e) => { e.preventDefault(); this.cambiarVista(key); }); 
+            }
+        });
     }
     static cambiarVista(vistaActiva) {
-        Object.values(this.vistas).forEach(v => v.classList.remove('active')); Object.values(this.navLinks).forEach(n => n.classList.remove('active'));
-        this.vistas[vistaActiva].classList.add('active'); this.navLinks[vistaActiva].classList.add('active');
+        Object.values(this.vistas).forEach(v => { if(v) v.classList.remove('active'); }); 
+        Object.values(this.navLinks).forEach(n => { if(n) n.classList.remove('active'); });
+        
+        if(this.vistas[vistaActiva]) this.vistas[vistaActiva].classList.add('active'); 
+        if(this.navLinks[vistaActiva]) this.navLinks[vistaActiva].classList.add('active');
+        
         if (vistaActiva === 'reportes') FinanzasSystem.renderizarReporte();
         if (vistaActiva === 'pedidos') PedidosSystem.renderizarPendientes();
         if (vistaActiva === 'historial') PedidosSystem.renderizarHistorial();
         if (vistaActiva === 'dashboard') DashboardSystem.renderizar();
+        if (vistaActiva === 'catalogo') CatalogoSystem.renderizar();
+        
         const navbarCollapse = document.getElementById('navbarNav');
         if (navbarCollapse.classList.contains('show')) document.querySelector('.navbar-toggler').click();
     }
 }
 
 // ==========================================
-// CLASE: VENTA RÁPIDA (NUEVO MÓDULO)
+// CLASE 7: CATÁLOGO DE PRODUCTOS (NUEVO)
+// ==========================================
+class CatalogoSystem {
+    static init() {
+        onSnapshot(query(collection(db, "productos"), orderBy("nombre", "asc")), (snapshot) => {
+            Estado.productos = [];
+            snapshot.forEach(doc => Estado.productos.push({ id: doc.id, ...doc.data() }));
+            this.renderizar();
+            PedidosSystem.actualizarCatalogo(); // Actualiza las barras de autocompletado
+        });
+    }
+
+    static renderizar() {
+        if (!UIManager.vistas.catalogo || !UIManager.vistas.catalogo.classList.contains('active')) return;
+        
+        const filtro = document.getElementById('filtro-catalogo-texto').value.toLowerCase();
+        let filtrados = Estado.productos;
+        if (filtro) {
+            filtrados = filtrados.filter(p => 
+                (p.nombre && p.nombre.toLowerCase().includes(filtro)) || 
+                (p.proveedor && p.proveedor.toLowerCase().includes(filtro))
+            );
+        }
+        
+        const tbody = document.getElementById('tabla-catalogo');
+        let html = '';
+        filtrados.forEach(p => {
+            html += `<tr>
+                <td class="fw-bold text-truncate" style="max-width: 150px;">${p.nombre}</td>
+                <td class="small text-muted">${p.proveedor || 'N/A'}<br><span style="font-size: 0.7rem;">${p.codigo_proveedor || ''}</span></td>
+                <td>
+                    <span class="text-danger d-block small">C: ₡${(p.costo || 0).toLocaleString('es-CR')}</span>
+                    <span class="text-success fw-bold d-block">V: ₡${(p.precio_venta || 0).toLocaleString('es-CR')}</span>
+                </td>
+                <td class="text-center">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="CatalogoSystem.abrirModal('${p.id}')"><i class="fas fa-pen"></i></button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="CatalogoSystem.borrar('${p.id}')"><i class="fas fa-trash"></i></button>
+                </td>
+            </tr>`;
+        });
+        tbody.innerHTML = html || '<tr><td colspan="4" class="text-center py-4">No hay productos registrados.</td></tr>';
+    }
+
+    static abrirModal(id = null) {
+        document.getElementById('form-producto').reset();
+        document.getElementById('prod-id').value = '';
+        document.getElementById('tituloModalProducto').innerHTML = '<i class="fas fa-tag"></i> Nuevo Producto';
+        
+        if (id) {
+            const p = Estado.productos.find(x => x.id === id);
+            if (p) {
+                document.getElementById('tituloModalProducto').innerHTML = '<i class="fas fa-pen"></i> Editar Producto';
+                document.getElementById('prod-id').value = p.id;
+                document.getElementById('prod-nombre').value = p.nombre;
+                document.getElementById('prod-proveedor').value = p.proveedor || '';
+                document.getElementById('prod-codigo').value = p.codigo_proveedor || '';
+                document.getElementById('prod-costo').value = p.costo || '';
+                document.getElementById('prod-venta').value = p.precio_venta || '';
+            }
+        }
+        if (Estado.modales.catalogo) Estado.modales.catalogo.show();
+    }
+
+    static async guardar(e) {
+        e.preventDefault();
+        const btn = e.target.querySelector('button'); btn.disabled = true;
+        const id = document.getElementById('prod-id').value;
+        const datos = {
+            nombre: document.getElementById('prod-nombre').value.trim(),
+            proveedor: document.getElementById('prod-proveedor').value.trim(),
+            codigo_proveedor: document.getElementById('prod-codigo').value.trim(),
+            costo: parseFloat(document.getElementById('prod-costo').value) || 0,
+            precio_venta: parseFloat(document.getElementById('prod-venta').value) || 0
+        };
+        
+        try {
+            if (id) await updateDoc(doc(db, "productos", id), datos);
+            else await addDoc(collection(db, "productos"), datos);
+            if (Estado.modales.catalogo) Estado.modales.catalogo.hide();
+            Swal.fire({ icon: 'success', title: 'Producto Guardado', timer: 1000, showConfirmButton: false });
+        } catch (err) { Swal.fire('Error', 'No se guardó el producto.', 'error'); } 
+        finally { btn.disabled = false; }
+    }
+
+    static async borrar(id) {
+        if ((await Swal.fire({ title: '¿Eliminar producto?', text: 'Esto no afectará los pedidos pasados.', icon: 'warning', showCancelButton: true })).isConfirmed) {
+            await deleteDoc(doc(db, "productos", id));
+        }
+    }
+}
+
+// ==========================================
+// CLASE: VENTA RÁPIDA
 // ==========================================
 class VentaRapidaSystem {
     static abrirModal() {
@@ -110,7 +220,6 @@ class VentaRapidaSystem {
     static async guardar(e) {
         e.preventDefault();
         const btn = e.target.querySelector('button'); btn.disabled = true;
-
         const cliente = document.getElementById('vr-cliente').value.trim();
         const telefono = document.getElementById('vr-telefono').value.trim();
         const producto = document.getElementById('vr-producto').value.trim();
@@ -122,47 +231,33 @@ class VentaRapidaSystem {
         if (montoPagado > precioTotal) { btn.disabled = false; return Swal.fire('Error', 'El pago no puede superar el precio total.', 'error'); }
 
         const deuda = precioTotal - montoPagado;
-
         const historial_pagos = [];
-        if (montoPagado > 0) {
-            historial_pagos.push({ fecha: fecha, monto: montoPagado, metodo: metodo });
-        }
+        if (montoPagado > 0) historial_pagos.push({ fecha: fecha, monto: montoPagado, metodo: metodo });
 
         const datosPedido = {
             fecha_solicitud: fecha, fecha_entrega: fecha, fecha_cierre: fecha,
             cliente: cliente, telefono: telefono, producto: producto, descripcion: 'Venta rápida / Mostrador',
-            precio: precioTotal, monto_pagado: montoPagado,
-            estado: 'Entregado', // Va directo al historial
-            ultimo_metodo_pago: montoPagado > 0 ? metodo : 'Pendiente',
-            historial_pagos: historial_pagos,
-            timestamp: new Date()
+            precio: precioTotal, monto_pagado: montoPagado, estado: 'Entregado',
+            ultimo_metodo_pago: montoPagado > 0 ? metodo : 'Pendiente', historial_pagos: historial_pagos, timestamp: new Date()
         };
 
         try {
             const docRef = await addDoc(collection(db, "pedidos"), datosPedido);
-
-            // Registrar finanzas de una vez
-            if (montoPagado > 0) {
-                await FinanzasSystem.registrarDesdePedido(metodo, fecha, `Venta Rápida: ${producto}`, cliente, montoPagado);
-            }
-
+            if (montoPagado > 0) await FinanzasSystem.registrarDesdePedido(metodo, fecha, `Venta Rápida: ${producto}`, cliente, montoPagado);
             if (Estado.modales.ventaRapida) Estado.modales.ventaRapida.hide();
-
             if ((await Swal.fire({ title: '¡Venta Registrada!', text: '¿Deseas enviar el comprobante?', icon: 'success', showCancelButton: true })).isConfirmed) {
                 TicketSystem.generar(docRef.id.slice(-5).toUpperCase(), cliente, producto, precioTotal, precioTotal, montoPagado, deuda, deuda <= 0 ? 'CANCELADO' : 'SALDO PENDIENTE', metodo);
             }
-        } catch (error) {
-            Swal.fire('Error', 'No se pudo procesar la venta rápida', 'error');
-        } finally { btn.disabled = false; }
+        } catch (error) { Swal.fire('Error', 'Fallo al guardar', 'error'); } 
+        finally { btn.disabled = false; }
     }
 }
 
-// ========================================== 
-// CLASE 3: SISTEMA DE PEDIDOS (KANBAN Y LEALTAD) 
-// ========================================== 
+// ==========================================
+// CLASE 3: SISTEMA DE PEDIDOS (KANBAN Y LEALTAD)
+// ==========================================
 class PedidosSystem {
     static limiteHistorial = 50;
-    static primeraCargaNotificaciones = true;
     static estadosActivos = ['Pendiente', 'En producción', 'Por Retirar'];
 
     static init() {
@@ -173,45 +268,8 @@ class PedidosSystem {
             this.renderizarPendientes();
             this.renderizarHistorial();
             if (UIManager.vistas.dashboard.classList.contains('active')) DashboardSystem.renderizar();
-
-            // --- NOTIFICACIONES DESACTIVADAS ---
-            /*
-            if (this.primeraCargaNotificaciones) { 
-                this.analizarNotificaciones(); 
-                this.primeraCargaNotificaciones = false; 
-            }
-            */
         });
     }
-
-    // --- ALERTAS DE INICIO (DESACTIVADAS) --- 
-    /*
-    static analizarNotificaciones() { 
-        const hoy = new Date(); hoy.setHours(0, 0, 0, 0); 
-        let atrasados = 0; let paraHoy = 0; 
-        Estado.pedidos.filter(p => p.estado === 'Pendiente').forEach(ped => { 
-            if (ped.fecha_entrega) { 
-                const diff = Math.ceil((new Date(ped.fecha_entrega + 'T00:00:00') - hoy) / 86400000); 
-                if (diff < 0) atrasados++; 
-                else if (diff === 0) paraHoy++; 
-            } 
-        }); 
-        if (atrasados > 0 || paraHoy > 0) { 
-            const mensaje = `¡Hola! Tienes ${atrasados} pedido(s) atrasados y ${paraHoy} para entregar hoy.`; 
-            document.getElementById('toast-body-texto').textContent = mensaje; 
-            new bootstrap.Toast(document.getElementById('toast-notificacion'), { delay: 6000 }).show(); 
-            if ("Notification" in window) { 
-                if (Notification.permission === "granted") { 
-                    navigator.serviceWorker.ready.then(reg => reg.showNotification("Trabajos Pendientes ⚠️", { body: mensaje, icon: "logo-masucri.png" })); 
-                } else if (Notification.permission !== "denied") { 
-                    Notification.requestPermission().then(permission => { 
-                        if (permission === "granted") navigator.serviceWorker.ready.then(reg => reg.showNotification("Trabajos Pendientes ⚠️", { body: mensaje, icon: "logo-masucri.png" })); 
-                    }); 
-                } 
-            } 
-        } 
-    } 
-    */
 
     // --- LEALTAD Y WHATSAPP ---
     static verificarLealtad() {
@@ -249,7 +307,10 @@ class PedidosSystem {
 
     static actualizarCatalogo() {
         const lista = document.getElementById('catalogo-productos'); if (!lista) return;
-        const u = [...new Set(Estado.pedidos.map(p => p.producto ? p.producto.trim() : ''))].filter(p => p !== '');
+        // Mezclamos los productos del Módulo Catálogo con los históricos de pedidos
+        const nombresCatalogo = Estado.productos.map(p => p.nombre.trim());
+        const nombresPedidos = Estado.pedidos.map(p => p.producto ? p.producto.trim() : '');
+        const u = [...new Set([...nombresCatalogo, ...nombresPedidos])].filter(p => p !== '');
         lista.innerHTML = u.map(prod => `<option value="${prod}">`).join('');
     }
 
@@ -266,11 +327,8 @@ class PedidosSystem {
     }
     static async cambiarEstado(id, nuevoEstado) {
         const ped = Estado.pedidos.find(p => p.id === id); if (!ped || ped.estado === nuevoEstado) return;
-        if (nuevoEstado === 'Entregado') {
-            this.entregar(id);
-        } else {
-            await updateDoc(doc(db, "pedidos", id), { estado: nuevoEstado });
-        }
+        if (nuevoEstado === 'Entregado') this.entregar(id);
+        else await updateDoc(doc(db, "pedidos", id), { estado: nuevoEstado });
     }
 
     static renderizarPendientes() {
@@ -279,13 +337,13 @@ class PedidosSystem {
         const colProduccion = document.getElementById('col-produccion');
         const colRetirar = document.getElementById('col-retirar');
         if (!colPendiente) return;
-        let cPen = 0, cPro = 0, cRet = 0;
-        let htmlPen = '', htmlPro = '', htmlRet = '';
+        let cPen = 0, cPro = 0, cRet = 0; let htmlPen = '', htmlPro = '', htmlRet = '';
         let activos = Estado.pedidos.filter(p => this.estadosActivos.includes(p.estado));
         const fTexto = document.getElementById('filtro-pedido-texto') ? document.getElementById('filtro-pedido-texto').value.toLowerCase() : '';
         if (fTexto) activos = activos.filter(p => (p.cliente && p.cliente.toLowerCase().includes(fTexto)) || (p.producto && p.producto.toLowerCase().includes(fTexto)));
         activos.sort((a, b) => new Date(a.fecha_entrega || '2099-01-01') - new Date(b.fecha_entrega || '2099-01-01'));
         const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+        
         activos.forEach(ped => {
             let colorAlerta = 'border-secondary';
             if (ped.fecha_entrega) {
@@ -323,7 +381,6 @@ class PedidosSystem {
         document.getElementById('count-retirar').textContent = cRet;
     }
 
-    // --- TABLA HISTORIAL ---
     static renderizarHistorial() {
         if (!UIManager.vistas.historial.classList.contains('active')) return;
         let historial = Estado.pedidos.filter(p => !this.estadosActivos.includes(p.estado)).sort((a, b) => new Date(b.fecha_cierre) - new Date(a.fecha_cierre));
@@ -334,10 +391,9 @@ class PedidosSystem {
         else if (filtro === 'entregados') historial = historial.filter(p => p.estado === 'Entregado' && (p.precio - (p.monto_pagado || 0)) <= 0);
         else if (filtro === 'anulados') historial = historial.filter(p => p.estado === 'Cancelado');
 
-        // REPARADO: Filtro por texto a prueba de valores vacíos (null)
         if (filtroTexto) {
-            historial = historial.filter(p =>
-                (p.cliente && p.cliente.toLowerCase().includes(filtroTexto)) ||
+            historial = historial.filter(p => 
+                (p.cliente && p.cliente.toLowerCase().includes(filtroTexto)) || 
                 (p.producto && p.producto.toLowerCase().includes(filtroTexto))
             );
         }
@@ -359,7 +415,6 @@ class PedidosSystem {
         tbody.innerHTML = html || `<tr><td colspan="4" class="text-center py-4 text-muted">No hay registros con la opción seleccionada.</td></tr>`;
     }
 
-    // --- DETALLES Y FLUJO ---
     static abrirDetallePedido(id) {
         const ped = Estado.pedidos.find(p => p.id === id); if (!ped) return;
         const deuda = (ped.precio || 0) - (ped.monto_pagado || 0);
@@ -411,7 +466,6 @@ class PedidosSystem {
                     <button class="btn btn-sm btn-outline-warning ${ped.estado === 'Por Retirar' ? 'active' : ''}" onclick="PedidosSystem.cambiarEstado('${ped.id}', 'Por Retirar')">Por Retirar</button>
                 </div>
             </div>`;
-
             footerHtml += `<div class="d-flex flex-wrap justify-content-center gap-2 w-100 mt-2">`;
             footerHtml += `<button class="btn btn-outline-info fw-bold" onclick="PedidosSystem.ejecutarAccionDetalle('reimprimir', '${ped.id}')"><i class="fas fa-receipt"></i> Ticket</button>`;
             footerHtml += `<button class="btn btn-success fw-bold" onclick="PedidosSystem.ejecutarAccionDetalle('entregar', '${ped.id}')"><i class="fas fa-check"></i> Entregar</button>`;
@@ -605,8 +659,7 @@ class DashboardSystem {
     static renderizar() {
         if (!UIManager.vistas.dashboard.classList.contains('active')) return;
         this.renderUtilidadNeta(); this.renderCRM(); this.renderVolatilidad(); this.renderEstacionalidad(); this.renderRetencion(); this.renderGastosAgrupados(); this.renderMetricasAvanzadas();
-
-        // REPARADO: Fallback por si la base de datos no tiene fechas o se está cargando
+        
         let todasLasFechas = [...Estado.pedidos.map(p => p.fecha_solicitud), ...Estado.movimientos.map(m => m.fecha)].filter(f => f);
         const divFechas = document.getElementById('bi-rango-fechas');
         if (divFechas) {
@@ -688,30 +741,30 @@ class App {
     static init() {
         UIManager.init();
         if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').then(reg => console.log('PWA lista')).catch(err => console.log('PWA falló', err)); }); }
-
+        
         const inputTel = document.getElementById('ped-telefono'); const inputNom = document.getElementById('ped-cliente');
         if (inputTel) inputTel.addEventListener('change', () => PedidosSystem.verificarLealtad()); if (inputNom) inputNom.addEventListener('change', () => PedidosSystem.verificarLealtad());
-
+        
         document.getElementById('form-pedido').addEventListener('submit', PedidosSystem.guardar);
         document.getElementById('form-venta-rapida').addEventListener('submit', VentaRapidaSystem.guardar);
         document.getElementById('form-movimiento').addEventListener('submit', FinanzasSystem.registrarManual);
         document.getElementById('form-editar-mov').addEventListener('submit', FinanzasSystem.guardarEdicion);
         document.getElementById('btn-export-pdf').addEventListener('click', () => this.exportar('pdf')); document.getElementById('btn-export-excel').addEventListener('click', () => this.exportar('excel'));
-
+        
         const fText = document.getElementById('filtro-pedido-texto'); const fSol = document.getElementById('filtro-pedido-solicitud');
         if (fText) fText.addEventListener('input', () => PedidosSystem.renderizarPendientes());
         if (fSol) fSol.addEventListener('input', () => PedidosSystem.renderizarPendientes());
-
+        
         const btnL = document.getElementById('btn-limpiar-pedidos');
         if (btnL) btnL.addEventListener('click', () => { if (fText) fText.value = ''; if (fSol) fSol.value = ''; PedidosSystem.renderizarPendientes(); });
-
+        
         document.getElementById('filtro-historial').addEventListener('change', () => PedidosSystem.renderizarHistorial());
         ['filtro-modo', 'filtro-inicio', 'filtro-fin'].forEach(id => document.getElementById(id).addEventListener('input', () => FinanzasSystem.renderizarReporte()));
-
+        
         const fTextHist = document.getElementById('filtro-historial-texto');
         if (fTextHist) fTextHist.addEventListener('input', () => PedidosSystem.renderizarHistorial());
 
-        // NUEVO: SISTEMA DE CONTACTOS PARA VENTA RÁPIDA (REPARADO)
+        // --- SISTEMA DE CONTACTOS PARA VENTA RÁPIDA (REPARADO Y BLINDADO) ---
         const btnContactosVR = document.getElementById('btn-contactos-vr');
         if (btnContactosVR) {
             if ('contacts' in navigator && 'ContactsManager' in window) {
@@ -732,13 +785,13 @@ class App {
                         }
                     } catch (ex) { console.log("Selección de contacto VR cancelada."); }
                 });
-            } else {
+            } else { 
                 btnContactosVR.classList.add('d-none');
                 if (btnContactosVR.parentElement) btnContactosVR.parentElement.classList.remove('input-group');
             }
         }
 
-        // --- SISTEMA DE CONTACTOS ORIGINAL (REPARADO) ---
+        // --- SISTEMA DE CONTACTOS ORIGINAL (REPARADO Y BLINDADO) ---
         const btnContactos = document.getElementById('btn-contactos');
         if (btnContactos) {
             if ('contacts' in navigator && 'ContactsManager' in window) {
@@ -760,11 +813,27 @@ class App {
                         }
                     } catch (ex) { console.log("Selección de contacto cancelada."); }
                 });
-            } else {
+            } else { 
                 btnContactos.classList.add('d-none');
                 if (btnContactos.parentElement) btnContactos.parentElement.classList.remove('input-group');
             }
         }
+
+        // --- SISTEMA DE AUTOCOMPLETADO DE PRECIOS DEL CATÁLOGO ---
+        const aplicarAutofill = (inputId, precioId) => {
+            const input = document.getElementById(inputId);
+            const precio = document.getElementById(precioId);
+            if (input && precio) {
+                input.addEventListener('change', () => {
+                    const prod = Estado.productos.find(p => p.nombre.toLowerCase() === input.value.trim().toLowerCase());
+                    if (prod && prod.precio_venta > 0 && !precio.value) {
+                        precio.value = prod.precio_venta;
+                    }
+                });
+            }
+        };
+        aplicarAutofill('ped-producto', 'ped-precio');
+        aplicarAutofill('vr-producto', 'vr-precio');
 
         document.getElementById('btn-login').addEventListener('click', () => signInWithPopup(auth, new GoogleAuthProvider()).catch(() => Swal.fire('Error', 'Fallo en login', 'error')));
         document.getElementById('btn-logout').addEventListener('click', async () => { if ((await Swal.fire({ title: '¿Salir?', icon: 'warning', showCancelButton: true })).isConfirmed) signOut(auth); });
@@ -784,7 +853,7 @@ class App {
         const btnScrollTop = document.getElementById('btn-scroll-top');
         if (btnScrollTop) {
             window.addEventListener('scroll', () => {
-                if (window.scrollY > 300) { btnScrollTop.classList.remove('d-none'); btnScrollTop.classList.add('d-flex'); }
+                if (window.scrollY > 300) { btnScrollTop.classList.remove('d-none'); btnScrollTop.classList.add('d-flex'); } 
                 else { btnScrollTop.classList.remove('d-flex'); btnScrollTop.classList.add('d-none'); }
             });
             btnScrollTop.addEventListener('click', () => { window.scrollTo({ top: 0, behavior: 'smooth' }); });
@@ -798,8 +867,11 @@ class App {
                 const mM = document.getElementById('modalEditarMov'); if (mM) Estado.modales.editarMov = new bootstrap.Modal(mM);
                 const mDP = document.getElementById('modalDetallePedido'); if (mDP) Estado.modales.detallePedido = new bootstrap.Modal(mDP);
                 const mVR = document.getElementById('modalVentaRapida'); if (mVR) Estado.modales.ventaRapida = new bootstrap.Modal(mVR);
-                PedidosSystem.init(); FinanzasSystem.init(); UIManager.cambiarVista('pedidos');
-            } else if (user) { await signOut(auth); Swal.fire({ icon: 'error', title: 'Acceso Denegado' }); }
+                const mCat = document.getElementById('modalProducto'); if (mCat) Estado.modales.catalogo = new bootstrap.Modal(mCat);
+                PedidosSystem.init(); FinanzasSystem.init(); 
+                if(typeof CatalogoSystem !== 'undefined') CatalogoSystem.init();
+                UIManager.cambiarVista('pedidos');
+            } else if (user) { await signOut(auth); Swal.fire({ icon: 'error', title: 'Acceso Denegado' }); } 
             else { document.getElementById('login-container').classList.remove('d-none'); document.getElementById('app-container').classList.add('d-none'); document.getElementById('app-container').classList.remove('d-flex'); }
         });
     }
@@ -823,4 +895,5 @@ App.init();
 window.PedidosSystem = PedidosSystem;
 window.FinanzasSystem = FinanzasSystem;
 window.VentaRapidaSystem = VentaRapidaSystem;
-window.cargarMasHistorial = () => { PedidosSystem.limiteHistorial += 50; PedidosSystem.renderizarHistorial(); };
+if(typeof CatalogoSystem !== 'undefined') window.CatalogoSystem = CatalogoSystem;
+window.cargarMasHistorial = () => { PedidosSystem.limiteHistorial += 50; PedidosSystem.renderizarHistorial(); };F
