@@ -692,14 +692,19 @@ class FinanzasSystem {
 class DashboardSystem {
     static renderizar() {
         if (!UIManager.vistas.dashboard.classList.contains('active')) return;
-        this.renderUtilidadNeta(); this.renderCRM(); this.renderVolatilidad();
-        this.renderEstacionalidad(); this.renderRetencion(); this.renderGastosAgrupados();
+
+        this.renderUtilidadNeta();
+        this.renderCRM();
+        this.renderVolatilidad();
+        this.renderEstacionalidad();
+        this.renderRetencion();
+        this.renderGastosAgrupados();
         this.renderMetricasAvanzadas();
 
         // NUEVAS FUNCIONES LLAMADAS AQUÍ
         this.renderTopGastos();
         this.renderTopProductos();
-        this.renderMetodosPago(); // <--- ¡ESTA ES LA LÍNEA QUE FALTABA!
+        this.renderMetodosPago(); // <--- ¡Asegurada y lista!
 
         let todasLasFechas = [...Estado.pedidos.map(p => p.fecha_solicitud), ...Estado.movimientos.map(m => m.fecha)].filter(f => f);
         const divFechas = document.getElementById('bi-rango-fechas');
@@ -718,24 +723,20 @@ class DashboardSystem {
     static renderTopGastos() {
         const gastosMap = {};
         Estado.movimientos.filter(m => m.tipo === 'salida').forEach(m => {
-            // Agrupar por Entidad. Si no hay entidad, buscar palabras clave en descripción.
             let entidad = (m.entidad || '').trim().toUpperCase();
             if (!entidad) {
                 const desc = (m.descripcion || '').toLowerCase();
                 if (desc.includes('ubora')) entidad = 'UBORA';
                 else if (desc.includes('aracely') || desc.includes('tela')) entidad = 'ARACELY (TELAS)';
-                else if (desc.includes('transporte') || desc.includes('bus') || desc.includes('transtusa')) entidad = 'TRANSPORTE PÚBLICO';
+                else if (desc.includes('transporte') || desc.includes('bus') || desc.includes('transtusa') || desc.includes('uber')) entidad = 'TRANSPORTE PÚBLICO';
                 else if (desc.includes('ice') || desc.includes('agua') || desc.includes('luz')) entidad = 'SERVICIOS (ICE/MUNI)';
                 else entidad = 'OTROS / SIN ESPECIFICAR';
             }
             gastosMap[entidad] = (gastosMap[entidad] || 0) + m.monto;
         });
-
-        // Ordenar de mayor a menor y agarrar los primeros 3
         const topGastos = Object.entries(gastosMap).sort((a, b) => b[1] - a[1]).slice(0, 3);
         const contenedor = document.getElementById('bi-top-gastos');
         if (!contenedor) return;
-
         let html = '';
         const medallas = ['🥇', '🥈', '🥉'];
         topGastos.forEach((gasto, index) => {
@@ -750,17 +751,13 @@ class DashboardSystem {
     // --- NUEVO: TOP 5 PRODUCTOS MÁS PEDIDOS ---
     static renderTopProductos() {
         const prodMap = {};
-        // Cuenta la frecuencia de cada producto en pedidos que NO estén cancelados
         Estado.pedidos.filter(p => p.estado !== 'Cancelado' && p.producto).forEach(p => {
-            const nombre = p.producto.trim().toUpperCase();
+            const nombre = String(p.producto).trim().toUpperCase();
             prodMap[nombre] = (prodMap[nombre] || 0) + 1;
         });
-
-        // Ordenar de mayor a menor y agarrar los primeros 5
         const topProd = Object.entries(prodMap).sort((a, b) => b[1] - a[1]).slice(0, 5);
         const contenedor = document.getElementById('bi-top-productos');
         if (!contenedor) return;
-
         let html = '';
         topProd.forEach((prod, index) => {
             html += `<li class="list-group-item d-flex justify-content-between align-items-center">
@@ -771,69 +768,76 @@ class DashboardSystem {
         contenedor.innerHTML = html || '<li class="list-group-item text-muted text-center py-3">No hay pedidos registrados.</li>';
     }
 
-    // --- NUEVO: DESGLOSE POR MÉTODO DE PAGO ---
+    // --- NUEVO: DESGLOSE POR MÉTODO DE PAGO (BLINDADO) ---
     static renderMetodosPago() {
-        const entradas = {};
-        const salidas = {};
-        let totalEntradas = 0;
-        let totalSalidas = 0;
+        try {
+            const entradas = {};
+            const salidas = {};
+            let totalEntradas = 0;
+            let totalSalidas = 0;
 
-        // Clasificar los movimientos
-        Estado.movimientos.forEach(m => {
-            let metodo = m.metodo_pago || 'Desconocido';
-            // Normalizar nombres por si acaso
-            if (metodo.toLowerCase().includes('efectivo')) metodo = 'Efectivo';
-            else if (metodo.toLowerCase().includes('sinpe')) metodo = 'Sinpe Móvil';
-            else if (metodo.toLowerCase().includes('transferencia')) metodo = 'Transferencia';
+            if (!Estado.movimientos) return;
 
-            if (m.tipo === 'entrada') {
-                entradas[metodo] = (entradas[metodo] || 0) + m.monto;
-                totalEntradas += m.monto;
-            } else {
-                salidas[metodo] = (salidas[metodo] || 0) + m.monto;
-                totalSalidas += m.monto;
-            }
-        });
+            // Clasificar los movimientos
+            Estado.movimientos.forEach(m => {
+                let metodo = m.metodo_pago ? String(m.metodo_pago) : 'Desconocido';
+                let metLower = metodo.toLowerCase();
 
-        const getIcon = (metodo) => {
-            if (metodo === 'Efectivo') return '<i class="fas fa-money-bill-wave text-success"></i>';
-            if (metodo === 'Sinpe Móvil') return '<i class="fas fa-mobile-alt text-info"></i>';
-            if (metodo === 'Transferencia') return '<i class="fas fa-university text-primary"></i>';
-            return '<i class="fas fa-wallet text-secondary"></i>';
-        };
+                // Normalizar nombres de manera segura
+                if (metLower.includes('efectivo')) metodo = 'Efectivo';
+                else if (metLower.includes('sinpe')) metodo = 'Sinpe Móvil';
+                else if (metLower.includes('transferencia')) metodo = 'Transferencia';
 
-        const renderList = (dataObj, total, elementId, colorBarra) => {
-            const contenedor = document.getElementById(elementId);
-            if (!contenedor) return;
+                if (m.tipo === 'entrada') {
+                    entradas[metodo] = (entradas[metodo] || 0) + m.monto;
+                    totalEntradas += m.monto;
+                } else if (m.tipo === 'salida') {
+                    salidas[metodo] = (salidas[metodo] || 0) + m.monto;
+                    totalSalidas += m.monto;
+                }
+            });
 
-            let html = '';
-            // Ordenar de mayor a menor monto
-            const dataArr = Object.entries(dataObj).sort((a, b) => b[1] - a[1]);
+            const getIcon = (met) => {
+                if (met === 'Efectivo') return '<i class="fas fa-money-bill-wave text-success"></i>';
+                if (met === 'Sinpe Móvil') return '<i class="fas fa-mobile-alt text-info"></i>';
+                if (met === 'Transferencia') return '<i class="fas fa-university text-primary"></i>';
+                return '<i class="fas fa-wallet text-secondary"></i>';
+            };
 
-            if (dataArr.length === 0) {
-                html = '<li class="list-group-item text-muted text-center py-3">Sin datos registrados.</li>';
-            } else {
-                dataArr.forEach(item => {
-                    const porcentaje = total > 0 ? ((item[1] / total) * 100).toFixed(1) : 0;
-                    html += `
-                    <li class="list-group-item pb-3">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span>${getIcon(item[0])} <span class="fw-bold ms-1">${item[0]}</span></span>
-                            <span class="fw-bold">₡${item[1].toLocaleString('es-CR')}</span>
-                        </div>
-                        <div class="progress" style="height: 8px;">
-                            <div class="progress-bar ${colorBarra}" role="progressbar" style="width: ${porcentaje}%;" aria-valuenow="${porcentaje}" aria-valuemin="0" aria-valuemax="100"></div>
-                        </div>
-                        <div class="text-end mt-1"><small class="text-muted">${porcentaje}% del total</small></div>
-                    </li>`;
-                });
-            }
-            contenedor.innerHTML = html;
-        };
+            const renderList = (dataObj, total, elementId, colorBarra) => {
+                const contenedor = document.getElementById(elementId);
+                if (!contenedor) return;
 
-        // Renderizar las dos listas con colores diferentes para la barrita
-        renderList(entradas, totalEntradas, 'bi-metodos-entrada', 'bg-success');
-        renderList(salidas, totalSalidas, 'bi-metodos-salida', 'bg-danger');
+                let html = '';
+                const dataArr = Object.entries(dataObj).sort((a, b) => b[1] - a[1]);
+
+                if (dataArr.length === 0) {
+                    html = '<li class="list-group-item text-muted text-center py-3">Sin datos registrados.</li>';
+                } else {
+                    dataArr.forEach(item => {
+                        const porcentaje = total > 0 ? ((item[1] / total) * 100).toFixed(1) : 0;
+                        html += `
+                        <li class="list-group-item pb-3 border-0 border-bottom border-light">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span>${getIcon(item[0])} <span class="fw-bold ms-1 text-dark">${item[0]}</span></span>
+                                <span class="fw-bold text-dark">₡${item[1].toLocaleString('es-CR')}</span>
+                            </div>
+                            <div class="progress shadow-sm" style="height: 10px; border-radius: 10px;">
+                                <div class="progress-bar ${colorBarra}" role="progressbar" style="width: ${porcentaje}%;" aria-valuenow="${porcentaje}" aria-valuemin="0" aria-valuemax="100"></div>
+                            </div>
+                            <div class="text-end mt-1"><small class="text-muted fw-semibold">${porcentaje}% del total</small></div>
+                        </li>`;
+                    });
+                }
+                contenedor.innerHTML = html;
+            };
+
+            renderList(entradas, totalEntradas, 'bi-metodos-entrada', 'bg-success');
+            renderList(salidas, totalSalidas, 'bi-metodos-salida', 'bg-danger');
+
+        } catch (error) {
+            console.error("Error renderizando métodos de pago:", error);
+        }
     }
 
     static renderMetricasAvanzadas() {
