@@ -189,7 +189,8 @@ class CatalogoSystem {
                 </td>
             </tr>`;
         });
-        tbody.innerHTML = html || '<tr><td colspan="4" class="text-center py-4">No hay productos registrados en el inventario.</td></tr>';
+
+        tbody.innerHTML = html || '<tr><td colspan="4" class="text-center py-4 text-muted">No hay productos registrados en el inventario.</td></tr>';
     }
 
     static abrirModal(id = null) {
@@ -767,6 +768,71 @@ class DashboardSystem {
                      </li>`;
         });
         contenedor.innerHTML = html || '<li class="list-group-item text-muted text-center py-3">No hay pedidos registrados.</li>';
+    }
+
+    // --- NUEVO: DESGLOSE POR MÉTODO DE PAGO ---
+    static renderMetodosPago() {
+        const entradas = {};
+        const salidas = {};
+        let totalEntradas = 0;
+        let totalSalidas = 0;
+
+        // Clasificar los movimientos
+        Estado.movimientos.forEach(m => {
+            let metodo = m.metodo_pago || 'Desconocido';
+            // Normalizar nombres por si acaso
+            if (metodo.toLowerCase().includes('efectivo')) metodo = 'Efectivo';
+            else if (metodo.toLowerCase().includes('sinpe')) metodo = 'Sinpe Móvil';
+            else if (metodo.toLowerCase().includes('transferencia')) metodo = 'Transferencia';
+
+            if (m.tipo === 'entrada') {
+                entradas[metodo] = (entradas[metodo] || 0) + m.monto;
+                totalEntradas += m.monto;
+            } else {
+                salidas[metodo] = (salidas[metodo] || 0) + m.monto;
+                totalSalidas += m.monto;
+            }
+        });
+
+        const getIcon = (metodo) => {
+            if (metodo === 'Efectivo') return '<i class="fas fa-money-bill-wave text-success"></i>';
+            if (metodo === 'Sinpe Móvil') return '<i class="fas fa-mobile-alt text-info"></i>';
+            if (metodo === 'Transferencia') return '<i class="fas fa-university text-primary"></i>';
+            return '<i class="fas fa-wallet text-secondary"></i>';
+        };
+
+        const renderList = (dataObj, total, elementId, colorBarra) => {
+            const contenedor = document.getElementById(elementId);
+            if (!contenedor) return;
+
+            let html = '';
+            // Ordenar de mayor a menor monto
+            const dataArr = Object.entries(dataObj).sort((a, b) => b[1] - a[1]);
+
+            if (dataArr.length === 0) {
+                html = '<li class="list-group-item text-muted text-center py-3">Sin datos registrados.</li>';
+            } else {
+                dataArr.forEach(item => {
+                    const porcentaje = total > 0 ? ((item[1] / total) * 100).toFixed(1) : 0;
+                    html += `
+                    <li class="list-group-item pb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span>${getIcon(item[0])} <span class="fw-bold ms-1">${item[0]}</span></span>
+                            <span class="fw-bold">₡${item[1].toLocaleString('es-CR')}</span>
+                        </div>
+                        <div class="progress" style="height: 8px;">
+                            <div class="progress-bar ${colorBarra}" role="progressbar" style="width: ${porcentaje}%;" aria-valuenow="${porcentaje}" aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
+                        <div class="text-end mt-1"><small class="text-muted">${porcentaje}% del total</small></div>
+                    </li>`;
+                });
+            }
+            contenedor.innerHTML = html;
+        };
+
+        // Renderizar las dos listas con colores diferentes para la barrita
+        renderList(entradas, totalEntradas, 'bi-metodos-entrada', 'bg-success');
+        renderList(salidas, totalSalidas, 'bi-metodos-salida', 'bg-danger');
     }
 
     static renderMetricasAvanzadas() {
