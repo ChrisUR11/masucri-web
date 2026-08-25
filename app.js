@@ -691,7 +691,13 @@ class FinanzasSystem {
 class DashboardSystem {
     static renderizar() {
         if (!UIManager.vistas.dashboard.classList.contains('active')) return;
-        this.renderUtilidadNeta(); this.renderCRM(); this.renderVolatilidad(); this.renderEstacionalidad(); this.renderRetencion(); this.renderGastosAgrupados(); this.renderMetricasAvanzadas();
+        this.renderUtilidadNeta(); this.renderCRM(); this.renderVolatilidad();
+        this.renderEstacionalidad(); this.renderRetencion(); this.renderGastosAgrupados();
+        this.renderMetricasAvanzadas();
+
+        // NUEVAS FUNCIONES LLAMADAS AQUÍ
+        this.renderTopGastos();
+        this.renderTopProductos();
 
         let todasLasFechas = [...Estado.pedidos.map(p => p.fecha_solicitud), ...Estado.movimientos.map(m => m.fecha)].filter(f => f);
         const divFechas = document.getElementById('bi-rango-fechas');
@@ -705,6 +711,64 @@ class DashboardSystem {
             }
         }
     }
+
+    // --- NUEVO: TOP 3 LUGARES DONDE SE VA LA PLATA ---
+    static renderTopGastos() {
+        const gastosMap = {};
+        Estado.movimientos.filter(m => m.tipo === 'salida').forEach(m => {
+            // Agrupar por Entidad. Si no hay entidad, buscar palabras clave en descripción.
+            let entidad = (m.entidad || '').trim().toUpperCase();
+            if (!entidad) {
+                const desc = (m.descripcion || '').toLowerCase();
+                if (desc.includes('ubora')) entidad = 'UBORA';
+                else if (desc.includes('aracely') || desc.includes('tela')) entidad = 'ARACELY (TELAS)';
+                else if (desc.includes('transporte') || desc.includes('bus') || desc.includes('transtusa')) entidad = 'TRANSPORTE PÚBLICO';
+                else if (desc.includes('ice') || desc.includes('agua') || desc.includes('luz')) entidad = 'SERVICIOS (ICE/MUNI)';
+                else entidad = 'OTROS / SIN ESPECIFICAR';
+            }
+            gastosMap[entidad] = (gastosMap[entidad] || 0) + m.monto;
+        });
+
+        // Ordenar de mayor a menor y agarrar los primeros 3
+        const topGastos = Object.entries(gastosMap).sort((a, b) => b[1] - a[1]).slice(0, 3);
+        const contenedor = document.getElementById('bi-top-gastos');
+        if (!contenedor) return;
+
+        let html = '';
+        const medallas = ['🥇', '🥈', '🥉'];
+        topGastos.forEach((gasto, index) => {
+            html += `<li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div class="text-truncate" style="max-width: 70%;"><span class="fs-5 me-2">${medallas[index]}</span> <span class="fw-bold">${gasto[0]}</span></div>
+                        <span class="badge bg-danger rounded-pill fs-6 shadow-sm">₡${gasto[1].toLocaleString('es-CR')}</span>
+                     </li>`;
+        });
+        contenedor.innerHTML = html || '<li class="list-group-item text-muted text-center py-3">No hay gastos registrados.</li>';
+    }
+
+    // --- NUEVO: TOP 5 PRODUCTOS MÁS PEDIDOS ---
+    static renderTopProductos() {
+        const prodMap = {};
+        // Cuenta la frecuencia de cada producto en pedidos que NO estén cancelados
+        Estado.pedidos.filter(p => p.estado !== 'Cancelado' && p.producto).forEach(p => {
+            const nombre = p.producto.trim().toUpperCase();
+            prodMap[nombre] = (prodMap[nombre] || 0) + 1;
+        });
+
+        // Ordenar de mayor a menor y agarrar los primeros 5
+        const topProd = Object.entries(prodMap).sort((a, b) => b[1] - a[1]).slice(0, 5);
+        const contenedor = document.getElementById('bi-top-productos');
+        if (!contenedor) return;
+
+        let html = '';
+        topProd.forEach((prod, index) => {
+            html += `<li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span class="text-truncate fw-bold" style="max-width: 75%;">${index + 1}. ${prod[0]}</span>
+                        <span class="badge bg-primary rounded-pill shadow-sm">${prod[1]} pedidos</span>
+                     </li>`;
+        });
+        contenedor.innerHTML = html || '<li class="list-group-item text-muted text-center py-3">No hay pedidos registrados.</li>';
+    }
+
     static renderMetricasAvanzadas() {
         const contenedor = document.getElementById('bi-metricas-avanzadas'); if (!contenedor) return;
         let totalTrabajos = 0; let anulados = 0; let pagados100 = 0; let conDeuda = 0; let deudores = []; const pedidosPorMes = {};

@@ -316,7 +316,7 @@
                     </div>
                 </div>
                 <div class="card shadow-sm border-0">
-                    <div class="card-body table-responsive p-0" style="max-height: 600px; overflow-y: auto;">
+                    <div class="card-body table-responsive p-0" style="height: calc(100vh - 200px); overflow-y: auto;">
                         <table class="table table-hover align-middle m-0 text-nowrap">
                             <thead class="table-light">
                                 <tr>
@@ -438,7 +438,8 @@
                                     <button id="btn-export-excel" class="btn btn-sm btn-success px-2">Excel</button>
                                 </div>
                             </div>
-                            <div class="card-body table-responsive p-0" style="max-height: 450px; overflow-y: auto;">
+                            <div class="card-body table-responsive p-0"
+                                style="height: calc(100vh - 300px); overflow-y: auto;">
                                 <table class="table table-hover align-middle m-0 text-nowrap">
                                     <thead class="table-light sticky-top shadow-sm">
                                         <tr>
@@ -478,7 +479,7 @@
                     <div class="card-body">
                         <input type="text" id="filtro-catalogo-texto" class="form-control mb-3 border-primary shadow-sm"
                             placeholder="Buscar por nombre o proveedor...">
-                        <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                        <div class="table-responsive" style="height: calc(100vh - 240px); overflow-y: auto;">
                             <table class="table table-hover align-middle m-0 text-nowrap">
                                 <thead class="table-light sticky-top">
                                     <tr>
@@ -577,6 +578,34 @@
                                 <div style="position: relative; height: 220px; width: 100%;">
                                     <canvas id="graficoGastos"></canvas>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- NUEVAS MÉTRICAS: TOP GASTOS Y PRODUCTOS -->
+                <div class="row mt-4 mb-4">
+                    <!-- Top 3 Lugares de Gasto -->
+                    <div class="col-md-6 mb-3">
+                        <div class="card shadow-sm border-0 h-100">
+                            <div class="card-header bg-danger text-white fw-bold"><i class="fas fa-money-bill-wave"></i>
+                                Top 3 Fugas de Capital (Lugares)</div>
+                            <div class="card-body p-0">
+                                <ul class="list-group list-group-flush" id="bi-top-gastos">
+                                    <!-- JS inyecta aquí -->
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Top 5 Productos -->
+                    <div class="col-md-6 mb-3">
+                        <div class="card shadow-sm border-0 h-100">
+                            <div class="card-header bg-primary text-white fw-bold"><i class="fas fa-fire"></i> Top 5
+                                Productos Más Pedidos</div>
+                            <div class="card-body p-0">
+                                <ul class="list-group list-group-flush" id="bi-top-productos">
+                                    <!-- JS inyecta aquí -->
+                                </ul>
                             </div>
                         </div>
                     </div>
