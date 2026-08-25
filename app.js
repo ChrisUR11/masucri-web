@@ -699,6 +699,7 @@ class DashboardSystem {
         // NUEVAS FUNCIONES LLAMADAS AQUÍ
         this.renderTopGastos();
         this.renderTopProductos();
+        this.renderMetodosPago(); // <--- ¡ESTA ES LA LÍNEA QUE FALTABA!
 
         let todasLasFechas = [...Estado.pedidos.map(p => p.fecha_solicitud), ...Estado.movimientos.map(m => m.fecha)].filter(f => f);
         const divFechas = document.getElementById('bi-rango-fechas');
